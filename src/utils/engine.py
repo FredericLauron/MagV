@@ -45,8 +45,7 @@ def train_one_epoch(
     aux_loss_metric = AverageMeter()
 
     for i, d in enumerate(train_dataloader):
-        # if i > 5:
-        #     break
+        
         d = d.to(device)
 
         optimizer.zero_grad()

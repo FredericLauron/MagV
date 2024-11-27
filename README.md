@@ -1,6 +1,6 @@
 # ALICE: Adapt your Learnable Image Compression modEl for variable bitrates 
 
-Pytorch implementation of the paper "**ALICE: Adapt your Learnable Image Compression modEl for variable bitrates**", published at VCIP 2024. This repository is based on [CompressAI](https://github.com/InterDigitalInc/CompressAI) and [STF](https://github.com/Googolxx/STF)
+Pytorch implementation of the paper "**ALICE: Adapt your Learnable Image Compression modEl for variable bitrates**", published at VCIP 2024. This repository is based on [CompressAI](https://github.com/InterDigitalInc/CompressAI) and [STF](https://github.com/Googolxx/STF).
 
 <div align="center">
 <img src="imgs/alice_arch.png" alt="teaser" width="1000"/>
@@ -35,7 +35,7 @@ The script for downloading [OpenImages](https://github.com/openimages) is provid
 ## Evaluation
 
 - Download our pretrained model in the ALICE directory from [here](https://drive.google.com/file/d/1Hz-5ODbXkSUOei807ThGSqL63Ow8ZanV/view?usp=sharing).
-- Extract model_results.zip
+- Extract pretrained.zip
 ```
 ALICE
 │   README.md
@@ -107,14 +107,14 @@ The training script is provided in
 ```
 cd src
 
-python train.py    --batch-size=16 --checkpoint=../pretrained/stf/stf_0483_best.pth.tar --cuda=1 --dataset=../../../data/small_openimages/ --epochs=15 --lambda=0.013 --learning-rate=0.0001 --lora=1 --lora-config=../configs/lora_8_8.yml --lora-opt=adam --lora-sched=cosine --model=stf --save=1 --save-dir=../results/adapt_models_lora/adapt_0483    --test-dir=../../../data/kodak/
+python train.py --batch-size=16 --checkpoint=../pretrained/stf/stf_0483_best.pth.tar --cuda=1 --dataset=../../../data/small_openimages/ --epochs=15 --lambda=0.013 --learning-rate=0.0001 --lora=1 --lora-config=../configs/lora_8_8.yml --lora-opt=adam --lora-sched=cosine --model=stf --save=1 --save-dir=../results/adapt_models_lora/adapt_0483 --test-dir=../../../data/kodak/
 ```
 
 ### Finetuning Only the FC layer (Vanilla):
 ```
 cd src
 
-python train.py --batch-size=16 --checkpoint=../pretrained/stf/stf_0483_best.pth.tar --cuda=1 --dataset=../../../data/small_openimages/ --epochs=15 --lambda=0.013 --learning-rate=0.0001 --lora=1                                       --lora-opt=adam --lora-sched=cosine --model=stf --save=1 --save-dir=../results/adapt_models_vanilla/adapt_0483 --test-dir=../../../data/kodak/ --vanilla-adapt=1
+python train.py --batch-size=16 --checkpoint=../pretrained/stf/stf_0483_best.pth.tar --cuda=1 --dataset=../../../data/small_openimages/ --epochs=15 --lambda=0.013 --learning-rate=0.0001 --lora=1 --lora-opt=adam --lora-sched=cosine --model=stf --save=1 --save-dir=../results/adapt_models_vanilla/adapt_0483 --test-dir=../../../data/kodak/ --vanilla-adapt=1
 ```
 
 Sweep files to adapt the model for all lambda values are saved in: 
@@ -141,7 +141,7 @@ Sweep files to adapt the model for all lambda values are saved in:
 ## Pretrained Models (from STF repo)
 Pretrained models (optimized for MSE) trained from scratch using randomly chose 300k images from the OpenImages dataset.
 
-| Method | Lambda | Link                                                                                              |
+| Method | Lambda | Link                                                                                           |
 | ---- |--------|---------------------------------------------------------------------------------------------------|
 | STF | 0.0018 | [stf_0018](https://drive.google.com/file/d/15ujpSjif628iwVEay3mAWN-Vyqls3r23/view?usp=sharing) |
 | STF | 0.0035 | [stf_0035](https://drive.google.com/file/d/1OFzZoEaofNgsimBuOPHtgOJiGsR_RS-M/view?usp=sharing)    |

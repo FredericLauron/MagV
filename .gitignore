@@ -1,6 +1,8 @@
 # Custom ignores
 wandb
 pretrained*
+!*.py
+
 results*
 
 # Byte-compiled / optimized / DLL files

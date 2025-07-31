@@ -17,10 +17,12 @@
 from custom_comp.models import SymmetricalTransFormer, WACNN
 
 from .pretrained import load_pretrained as load_state_dict
-
+from compressai.models.waseda import Cheng2020Attention
+from compressai.zoo import cheng2020_attn
 # from compressai.zoo.pretrained import load_pretrained
 
 models = {
     'stf': SymmetricalTransFormer,
     'cnn': WACNN,
+    'cheng': lambda:cheng2020_attn(quality=6,pretrained=True),
 }

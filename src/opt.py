@@ -109,7 +109,7 @@ def parse_args():
 
     parser.add_argument("--lora-opt", type = str, default='adam', choices=['adam','sgd'])
     parser.add_argument("--lora-sched", type = str, default='lr_plateau', choices=['lr_plateau','cosine'])
-
+    parser.add_argument("--mask", action="store_true",help="Apply pruning mask to the model")
 
 
 

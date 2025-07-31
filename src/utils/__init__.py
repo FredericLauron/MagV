@@ -8,6 +8,7 @@ from .engine import test_epoch,train_one_epoch, compress_one_epoch
 from .loss import RateDistortionLoss
 from .dataset import TestKodakDataset
 from .functions import compute_metrics, compute_msssim, compute_psnr
+from .masks import delete_mask, save_mask, generate_mask,apply_saved_mask
 
 import random
 import os

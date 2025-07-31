@@ -31,7 +31,7 @@ from custom_comp.zoo import models
 
 from opt import parse_args
 
-from utils import train_one_epoch, test_epoch,compress_one_epoch, RateDistortionLoss, CustomDataParallel, configure_optimizers, save_checkpoint, seed_all, TestKodakDataset
+from utils import train_one_epoch, test_epoch,compress_one_epoch, RateDistortionLoss, CustomDataParallel, configure_optimizers, save_checkpoint, seed_all, TestKodakDataset, generate_mask,save_mask, delete_mask,apply_saved_mask
 import os
 import wandb
 
@@ -51,13 +51,13 @@ def main():
         seed_all(args.seed)
         args.save_dir = f'{args.save_dir}_seed_{args.seed}'
     
-    if args.lora:
-        if args.vanilla_adapt:
-            conf_name = 'vanilla_adapt'
-        else:
-            conf_name = str(args.lora_config).split('/')[-1].replace('.yml','').replace('.yaml','')
-        init_lr = str(args.learning_rate).replace('0.','0_')
-        args.save_dir = f'{args.save_dir}_conf_{conf_name}_opt_{args.lora_opt}_sched_{args.lora_sched}_lr_{init_lr}'
+    # if args.lora:
+    #     if args.vanilla_adapt:
+    #         conf_name = 'vanilla_adapt'
+    #     else:
+    #         conf_name = str(args.lora_config).split('/')[-1].replace('.yml','').replace('.yaml','')
+    #     init_lr = str(args.learning_rate).replace('0.','0_')
+    #     args.save_dir = f'{args.save_dir}_conf_{conf_name}_opt_{args.lora_opt}_sched_{args.lora_sched}_lr_{init_lr}'
 
     if log_wandb:
         wandb.init(
@@ -147,35 +147,35 @@ def main():
             best_val_loss = checkpoint["best_val_loss"]
             best_kodak_loss = checkpoint["best_kodak_loss"]
 
-    if args.lora:
-        for param in net.parameters():
-            param.requires_grad = False
+    # if args.lora:
+    #     for param in net.parameters():
+    #         param.requires_grad = False
 
-        if args.vanilla_adapt:
-            net = get_vanilla_finetuned_model(net)
-        else:
-            net = get_lora_model(net, args.lora_config)
-        net = net.to(device)
+    #     if args.vanilla_adapt:
+    #         net = get_vanilla_finetuned_model(net)
+    #     else:
+    #         net = get_lora_model(net, args.lora_config)
+    #     net = net.to(device)
 
 
-        # print('Trainable parameters')
-        # for name, param in net.named_parameters():
-        #     if param.requires_grad:
-        #         print(name)
-        # print(f"{name}: {param.requires_grad}")
+    #     # print('Trainable parameters')
+    #     # for name, param in net.named_parameters():
+    #     #     if param.requires_grad:
+    #     #         print(name)
+    #     # print(f"{name}: {param.requires_grad}")
         
-        total_params  = sum(p.numel() for p in net.parameters() if p.requires_grad)
-        print(f'Total number of trainable parameters: {total_params}')
+    #     total_params  = sum(p.numel() for p in net.parameters() if p.requires_grad)
+    #     print(f'Total number of trainable parameters: {total_params}')
 
-        # redefine optimizers and scheduler
+    #     # redefine optimizers and scheduler
         
-        optimizer, aux_optimizer = configure_optimizers(net, args, assert_intersection=False, opt = args.lora_opt)
-        if args.lora_sched == 'lr_plateau':
-            print('Using ReduceLROnPlateau scheduler')
-            lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, "min", factor=0.3, patience=4)
-        elif args.lora_sched == 'cosine':
-            print('Using Cosine scheduler')
-            lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
+    #     optimizer, aux_optimizer = configure_optimizers(net, args, assert_intersection=False, opt = args.lora_opt)
+    #     if args.lora_sched == 'lr_plateau':
+    #         print('Using ReduceLROnPlateau scheduler')
+    #         lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, "min", factor=0.3, patience=4)
+    #     elif args.lora_sched == 'cosine':
+    #         print('Using Cosine scheduler')
+    #         lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
 
 
         
@@ -186,9 +186,25 @@ def main():
     else:
         print(f'Training on a single GPU')
 
+    #mask and pruning
+    if args.mask and args.model=="cheng":
+        amounts = [0.6,0.5,0.4,0.3,0.2,0.0]
+        lambda_list = [0.0018,0.0035,0.0067,0.0130,0.0250,0.483]
+        all_mask, parameters_to_prune = generate_mask(net.g_a, amounts)
+
 
     for epoch in range(last_epoch, args.epochs):
         print(f"Learning rate: {optimizer.param_groups[0]['lr']}")
+
+        # if args.mask and args.model=="cheng":
+        #     index = torch.randint(0,6,(1,))
+        #     print("index:", index)
+        #     mask = all_mask[index]
+        #     lambda_value = lambda_list[index]
+
+        #     apply_saved_mask(net.g_a, mask)
+        #     criterion.lmbda = lambda_value
+
 
         # Training 
         loss_tot_train, bpp_train, mse_train, aux_train_loss = train_one_epoch(
@@ -199,7 +215,12 @@ def main():
             aux_optimizer,
             epoch,
             args.clip_max_norm,
+            args_mask=args.mask,
+            all_mask=all_mask if args.mask and args.model=="cheng" else None,
+            lambda_list=lambda_list if args.mask and args.model=="cheng" else None,
+            parameters_to_prune=parameters_to_prune if args.mask and args.model=="cheng" else None
         )
+
         if log_wandb:
             wandb.log({
                 "train/epoch":epoch,

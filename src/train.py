@@ -31,7 +31,7 @@ from custom_comp.zoo import models
 
 from opt import parse_args
 
-from utils import train_one_epoch, test_epoch,compress_one_epoch, RateDistortionLoss, CustomDataParallel, configure_optimizers, save_checkpoint, seed_all, TestKodakDataset, generate_mask,save_mask, delete_mask,apply_saved_mask
+from utils import train_one_epoch, test_epoch,compress_one_epoch, RateDistortionLoss, CustomDataParallel, configure_optimizers, save_checkpoint, seed_all, TestKodakDataset, generate_mask,save_mask, delete_mask,apply_saved_mask,plot_rate_distorsion
 import os
 import wandb
 
@@ -232,6 +232,7 @@ def main():
 
 
         # test on validation set
+        #TODO test for every rate
         loss_tot_val, bpp_loss_val, mse_loss_val, aux_loss_val, psnr_val, ssim_val = test_epoch(epoch, val_dataloader, net, criterion, tag = 'Val')
         if isinstance(lr_scheduler, optim.lr_scheduler.ReduceLROnPlateau):
             lr_scheduler.step(loss_tot_val)
@@ -271,6 +272,7 @@ def main():
 
 
         # test on kodak
+        # TODO test for every rate
         loss_tot_kodak, bpp_loss_kodak, mse_loss_kodak, aux_loss_kodak, psnr_kodak, ssim_kodak = test_epoch(epoch, kodak_dataloader, net, criterion, tag = 'Kodak')
         if log_wandb:
             wandb.log({
@@ -303,15 +305,39 @@ def main():
 
         # try to estimate metrics with the real Arithmetic coding (AC) 
         if epoch%10==0:
+            bpp_list = []
+            psnr_list = []
+            mssim_list = []       
+
             print("Make actual compression")
             net.update(force = True)
+
+            for index in range(len(amounts)):
+                # aplly the mask and lambda value
+                apply_saved_mask(net.g_a, all_mask[index])
+
             bpp_ac, psnr_ac, mssim_ac = compress_one_epoch(net, kodak_dataloader, device)
+            bpp_list.append(bpp_ac)
+            psnr_list.append(psnr_ac)
+            mssim_list.append(mssim_ac)
+
             if log_wandb:
                 wandb.log({
                     f"kodak_compress/bpp_with_ac": bpp_ac,
                     f"kodak_compress/psnr_with_ac": psnr_ac,
                     f"kodak_compress/mssim_with_ac":mssim_ac
-                },step = epoch)  
+                },step = epoch) 
+
+            psnr_res = {}
+            mssim_res = {}
+            bpp_res = {} 
+
+            bpp_res["ours"] = bpp_list
+            psnr_res["ours"] = psnr_list
+            mssim_res["ours"] = mssim_list
+
+            plot_rate_distorsion(bpp_res, psnr_res, epoch, eest="compression", metric = 'PSNR',save_fig=False, log_wandb=log_wandb)
+            plot_rate_distorsion(bpp_res, mssim_res, epoch, eest="compression_mssim", metric = 'MS-SSIM',save_fig=False, log_wandb=log_wandb, is_psnr=False)
     
     if log_wandb:
         wandb.run.finish()

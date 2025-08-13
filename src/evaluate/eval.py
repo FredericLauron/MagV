@@ -45,6 +45,7 @@ from utils import compute_metrics, seed_all
 from lora import get_lora_model
 import seaborn as sns
 palette = sns.color_palette("tab10")
+
 def plot_rate_distorsion(bpp_res, psnr_res,epoch, eest = "compression",metric = 'PSNR', save_fig = False, file_name = None, log_wandb = True, is_psnr = True):
 
     chiavi_da_mettere = list(psnr_res.keys())

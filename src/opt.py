@@ -110,6 +110,8 @@ def parse_args():
     parser.add_argument("--lora-opt", type = str, default='adam', choices=['adam','sgd'])
     parser.add_argument("--lora-sched", type = str, default='lr_plateau', choices=['lr_plateau','cosine'])
     parser.add_argument("--mask", action="store_true",help="Apply pruning mask to the model")
+    parser.add_argument("--maxPrunning", type=float,help="Percentage max of pruning of the model")
+    parser.add_argument("--nameRun", type = str, default='Magv', help="name of the run")
 
 
 

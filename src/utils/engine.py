@@ -1,8 +1,9 @@
 import torch
 from utils.functions import compute_psnr, compute_metrics, compute_msssim
 from compressai.ops import compute_padding
-from utils import delete_mask, save_mask, generate_mask,apply_saved_mask
-from compressai.zoo import cheng2020_attn
+from utils.masks import delete_mask, save_mask, generate_mask,apply_saved_mask
+
+from compressai.models.waseda import Cheng2020Attention
 
 import torch.nn.functional as F
 
@@ -54,13 +55,15 @@ def train_one_epoch(
         # Mask selection. 
         # A mask is ramdomly selected (uniform distribution) from the list of masks.
         # The associated lambda is then selected from the lambda_list.     
-        if args_mask is not None and isinstance(model, cheng2020_attn) and lambda_list is not None:
+        if args_mask is not None and isinstance(model, Cheng2020Attention) and lambda_list is not None:
             index = torch.randint(0,6,(1,))
-            mask = all_mask[index]
-            lambda_value = lambda_list[index]
-            print("index:", index, "lambda_value:", lambda_value)
 
-            apply_saved_mask(model.g_a, mask)
+            lambda_value = lambda_list[index]
+            #print("index:", index, "lambda_value:", lambda_value)
+
+            apply_saved_mask(model.g_a, all_mask["g_a"][index])
+            apply_saved_mask(model.g_s, all_mask["g_s"][index])
+
             criterion.lmbda = lambda_value
 
         optimizer.zero_grad()
@@ -125,8 +128,9 @@ def train_one_epoch(
         mse_loss_metric.update(out_criterion["mse_loss"].clone().detach())
         aux_loss_metric.update(aux_loss.clone().detach())
 
-        if args_mask and isinstance(model, cheng2020_attn):
-            delete_mask(model.g_a, parameters_to_prune)
+        if args_mask and isinstance(model, Cheng2020Attention):
+            delete_mask(model.g_a, parameters_to_prune["g_a"])
+            delete_mask(model.g_s, parameters_to_prune["g_s"])
 
     return loss_tot_metric.avg, bpp_loss_metric.avg, mse_loss_metric.avg, aux_loss_metric.avg
 

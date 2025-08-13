@@ -31,22 +31,45 @@ from custom_comp.zoo import models
 
 from opt import parse_args
 
-from utils import train_one_epoch, test_epoch,compress_one_epoch, RateDistortionLoss, CustomDataParallel, configure_optimizers, save_checkpoint, seed_all, TestKodakDataset, generate_mask,save_mask, delete_mask,apply_saved_mask,plot_rate_distorsion
+from utils import train_one_epoch, test_epoch,compress_one_epoch, RateDistortionLoss, CustomDataParallel, configure_optimizers, save_checkpoint, seed_all, TestKodakDataset, generate_mask,save_mask, delete_mask,apply_saved_mask
+from evaluate import plot_rate_distorsion
 import os
 import wandb
 
 from lora import get_lora_model, get_vanilla_finetuned_model
 
+import numpy as np
+import json
 
+from compressai.zoo import cheng2020_attn
+
+# Mask: python train.py --batch-size=16 --cuda=1 --dataset=/home/ids/flauron-23/fiftyone/open-images-v6 --epochs=15 --lambda=0.013 --learning-rate=0.0001 --model=cheng --save=1 --save-dir=../results/mask/adapt_0483 --test-dir=/home/ids/flauron-23/kodak --vanilla-adapt=1 -n=8 --mask
 # Vanilla: python train.py --batch-size=16 --checkpoint=../pretrained/stf/stf_0483_best.pth.tar --cuda=1 --dataset=../../../data/small_openimages/ --epochs=15 --lambda=0.013 --learning-rate=0.0001 --lora=1                                       --lora-opt=adam --lora-sched=cosine --model=stf --save=1 --save-dir=../results/adapt_models_vanilla/adapt_0483 --test-dir=../../../data/kodak/ --vanilla-adapt=1
 # LORA: python train.py    --batch-size=16 --checkpoint=../pretrained/stf/stf_0483_best.pth.tar --cuda=1 --dataset=../../../data/small_openimages/ --epochs=15 --lambda=0.013 --learning-rate=0.0001 --lora=1 --lora-config=../configs/lora_8_8.yml --lora-opt=adam --lora-sched=cosine --model=stf --save=1 --save-dir=../results/adapt_models_lora/adapt_0483    --test-dir=../../../data/kodak/
 
 def main():
-    log_wandb = False
+    log_wandb = True
     args = parse_args()
     print(args)
 
+    #Folder where data are saved for this run
+    img_dir = os.path.join(os.path.dirname(__file__), "..", "imgs", args.nameRun)
+    data_dir = os.path.join(os.path.dirname(__file__), "..", "data", args.nameRun)
+    mask_dir = os.path.join(data_dir,"masks")
+    res_dir = os.path.join(data_dir,"results")
+    model_dir = os.path.join(data_dir,"models")
+    os.makedirs(img_dir, exist_ok=True)
+    os.makedirs(data_dir, exist_ok=True)
+    os.makedirs(mask_dir, exist_ok=True)
+    os.makedirs(res_dir, exist_ok=True)
+    os.makedirs(model_dir, exist_ok=True)
+ 
 
+
+    if not args.mask:
+        print("Mask is 0 or False — exiting program.")
+        return
+    
     if args.seed is not None:
         seed_all(args.seed)
         args.save_dir = f'{args.save_dir}_seed_{args.seed}'
@@ -61,8 +84,9 @@ def main():
 
     if log_wandb:
         wandb.init(
-            project='ALICE',
-            name=f'{args.save_dir}',
+            project='training',
+            entity='MagV',
+            name=f'{args.nameRun}',
             config=vars(args)
         )
 
@@ -187,10 +211,24 @@ def main():
         print(f'Training on a single GPU')
 
     #mask and pruning
+    all_mask={}
+    parameters_to_prune={}
+    #amounts = [0.6,0.5,0.4,0.3,0.2,0.0] #[0.7, ...,0.0]
+    amounts = np.linspace(0, args.maxPrunning, 6)[::-1]
+    lambda_list = [0.0018,0.0035,0.0067,0.0130,0.0250,0.483]
+
     if args.mask and args.model=="cheng":
-        amounts = [0.6,0.5,0.4,0.3,0.2,0.0]
-        lambda_list = [0.0018,0.0035,0.0067,0.0130,0.0250,0.483]
-        all_mask, parameters_to_prune = generate_mask(net.g_a, amounts)
+
+        #all_mask, parameters_to_prune = generate_mask(net.g_a, amounts)
+        all_mask["g_a"], parameters_to_prune["g_a"] = generate_mask(net.g_a, amounts)
+        all_mask["g_s"], parameters_to_prune["g_s"] = generate_mask(net.g_s, amounts)
+        
+        
+        #save the mask    
+        #with open('/home/ids/flauron-23/MagV/results/mask/mask/mask.json', 'w') as f:
+            #json.dump(all_mask, f)
+ 
+        torch.save(all_mask, f"{mask_dir}/mask_{args.nameRun}.pth")
 
 
     for epoch in range(last_epoch, args.epochs):
@@ -230,118 +268,264 @@ def main():
                 "train/aux_loss":aux_train_loss
             },step = epoch)      
 
-
+        ############################################################################
         # test on validation set
-        #TODO test for every rate
-        loss_tot_val, bpp_loss_val, mse_loss_val, aux_loss_val, psnr_val, ssim_val = test_epoch(epoch, val_dataloader, net, criterion, tag = 'Val')
-        if isinstance(lr_scheduler, optim.lr_scheduler.ReduceLROnPlateau):
-            lr_scheduler.step(loss_tot_val)
+        ############################################################################
+        if args.mask and args.model=="cheng":
+            total_losses=[]
+            for i in range(len(amounts)):
+
+                apply_saved_mask(net.g_a,all_mask["g_a"][i])
+                apply_saved_mask(net.g_s,all_mask["g_s"][i])
+                loss_tot_val, bpp_loss_val, mse_loss_val, aux_loss_val, psnr_val, ssim_val = test_epoch(epoch, val_dataloader, net, criterion, tag = 'Val')
+                delete_mask(net.g_a,parameters_to_prune["g_a"])
+                delete_mask(net.g_s,parameters_to_prune["g_s"])
+
+                if log_wandb:
+                    wandb.log({
+                        "val/epoch":epoch,
+                        f"val_{i}/loss": loss_tot_val,
+                        f"val_{i}/bpp_loss": bpp_loss_val,
+                        f"val_{i}/mse_loss": mse_loss_val,
+                        f"val_{i}/aux_loss":aux_loss_val,
+                        f"val_{i}/psnr":psnr_val,
+                        f"val_{i}/mssim":ssim_val,
+                    },step = epoch)   
+
+                total_losses.append(loss_tot_val)
+            
+            #Average the loss to update learning rate 
+            avg_loss_tot_val = sum(total_losses) / len(total_losses)
+            if isinstance(lr_scheduler, optim.lr_scheduler.ReduceLROnPlateau):
+                lr_scheduler.step(avg_loss_tot_val)
+            else:
+                lr_scheduler.step()
+            
+            # save checkpoint according to val_loss
+            is_best_val = avg_loss_tot_val < best_val_loss
+            best_val_loss = min(avg_loss_tot_val, best_val_loss)
+            if args.save:
+                save_checkpoint(
+                    {
+                        "epoch": epoch,
+                        "state_dict": net.state_dict(),
+                        "best_val_loss": best_val_loss,
+                        "best_kodak_loss":best_kodak_loss,
+                        "optimizer": optimizer.state_dict(),
+                        "aux_optimizer": aux_optimizer.state_dict() if aux_optimizer is not None else None,
+                        "lr_scheduler": lr_scheduler.state_dict(),
+                    },
+                    is_best_val,
+                    out_dir=model_dir,
+                    #filename=f"{str(args.lmbda).replace('0.','')}_checkpoint.pth.tar"
+                    filename=f"{args.nameRun}_checkpoint.pth.tar"
+                )
+
+
         else:
-            lr_scheduler.step()
-
-        if log_wandb:
-            wandb.log({
-                "val/epoch":epoch,
-                "val/loss": loss_tot_val,
-                "val/bpp_loss": bpp_loss_val,
-                "val/mse_loss": mse_loss_val,
-                "val/aux_loss":aux_loss_val,
-                "val/psnr":psnr_val,
-                "val/mssim":ssim_val,
-            },step = epoch)      
+            loss_tot_val, bpp_loss_val, mse_loss_val, aux_loss_val, psnr_val, ssim_val = test_epoch(epoch, val_dataloader, net, criterion, tag = 'Val')
 
 
-        # save checkpoint according to val_loss
-        is_best_val = loss_tot_val < best_val_loss
-        best_val_loss = min(loss_tot_val, best_val_loss)
-        if args.save:
-            save_checkpoint(
-                {
-                    "epoch": epoch,
-                    "state_dict": net.state_dict(),
-                    "best_val_loss": best_val_loss,
-                    "best_kodak_loss":best_kodak_loss,
-                    "optimizer": optimizer.state_dict(),
-                    "aux_optimizer": aux_optimizer.state_dict() if aux_optimizer is not None else None,
-                    "lr_scheduler": lr_scheduler.state_dict(),
-                },
-                is_best_val,
-                args.save_dir,
-                filename=f"{str(args.lmbda).replace('0.','')}_checkpoint.pth.tar"
-            )
+            if isinstance(lr_scheduler, optim.lr_scheduler.ReduceLROnPlateau):
+                lr_scheduler.step(loss_tot_val)
+            else:
+                lr_scheduler.step()
+
+            if log_wandb:
+                wandb.log({
+                    "val/epoch":epoch,
+                    "val/loss": loss_tot_val,
+                    "val/bpp_loss": bpp_loss_val,
+                    "val/mse_loss": mse_loss_val,
+                    "val/aux_loss":aux_loss_val,
+                    "val/psnr":psnr_val,
+                    "val/mssim":ssim_val,
+                },step = epoch)      
+
+            # save checkpoint according to val_loss
+            is_best_val = loss_tot_val < best_val_loss
+            best_val_loss = min(loss_tot_val, best_val_loss)
+            if args.save:
+                save_checkpoint(
+                    {
+                        "epoch": epoch,
+                        "state_dict": net.state_dict(),
+                        "best_val_loss": best_val_loss,
+                        "best_kodak_loss":best_kodak_loss,
+                        "optimizer": optimizer.state_dict(),
+                        "aux_optimizer": aux_optimizer.state_dict() if aux_optimizer is not None else None,
+                        "lr_scheduler": lr_scheduler.state_dict(),
+                    },
+                    is_best_val,
+                    args.save_dir,
+                    filename=f"{str(args.lmbda).replace('0.','')}_checkpoint.pth.tar"
+                )
 
 
-        # test on kodak
-        # TODO test for every rate
-        loss_tot_kodak, bpp_loss_kodak, mse_loss_kodak, aux_loss_kodak, psnr_kodak, ssim_kodak = test_epoch(epoch, kodak_dataloader, net, criterion, tag = 'Kodak')
-        if log_wandb:
-            wandb.log({
-                "kodak/epoch":epoch,
-                "kodak/loss": loss_tot_kodak,
-                "kodak/bpp_loss": bpp_loss_kodak,
-                "kodak/mse_loss": mse_loss_kodak,
-                "kodak/aux_loss":aux_loss_kodak,
-                "kodak/psnr":psnr_kodak,
-                "kodak/mssim":ssim_kodak,
-            },step = epoch)   
+        ############################################################################
+        #  test on kodak
+        ############################################################################
+        if args.mask and args.model=="cheng" :
+                total_losses_kodak=[]
+                for i in range(len(amounts)):
 
-        # save best kodak model        
-        is_best_kodak = loss_tot_kodak < best_kodak_loss
-        best_kodak_loss = min(loss_tot_val, best_kodak_loss)
-        if(args.save and is_best_kodak):
-            save_checkpoint(
-                {
-                    "epoch": epoch,
-                    "state_dict": net.state_dict(),
-                    "best_val_loss": best_val_loss,
-                    "best_kodak_loss":best_kodak_loss,
-                    "optimizer": optimizer.state_dict(),
-                    "aux_optimizer": aux_optimizer.state_dict() if aux_optimizer is not None else None,
-                    "lr_scheduler": lr_scheduler.state_dict(),
-                },
-                False, out_dir = args.save_dir, filename=f"{str(args.lmbda).replace('0.','')}_checkpoint_best_kodak.pth.tar"
-            )
+                    apply_saved_mask(net.g_a,all_mask["g_a"][i])
+                    apply_saved_mask(net.g_s,all_mask["g_s"][i])
+                    loss_tot_kodak, bpp_loss_kodak, mse_loss_kodak, aux_loss_kodak, psnr_kodak, ssim_kodak = test_epoch(epoch, kodak_dataloader, net, criterion, tag = 'Kodak')
+                    delete_mask(net.g_a,parameters_to_prune["g_a"])
+                    delete_mask(net.g_s,parameters_to_prune["g_s"])
+
+                    if log_wandb:
+                        wandb.log({
+                            "kodak/epoch":epoch,
+                            f"kodak_{i}/loss": loss_tot_kodak,
+                            f"kodak_{i}/bpp_loss": bpp_loss_kodak,
+                            f"kodak_{i}/mse_loss": mse_loss_kodak,
+                            f"kodak_{i}/aux_loss":aux_loss_kodak,
+                            f"kodak_{i}/psnr":psnr_kodak,
+                            f"kodak_{i}/mssim":ssim_kodak,
+                        },step = epoch)   
+                    total_losses_kodak.append(loss_tot_kodak)
+                
+                # Average the loss    
+                avg_loss_tot_kodak = sum(total_losses) / len(total_losses)
+
+                is_best_kodak = avg_loss_tot_kodak < best_kodak_loss
+                best_kodak_loss = min(avg_loss_tot_kodak, best_kodak_loss)
+
+                if(args.save and is_best_kodak):
+                    save_checkpoint(
+                        {
+                            "epoch": epoch,
+                            "state_dict": net.state_dict(),
+                            "best_val_loss": best_val_loss,
+                            "best_kodak_loss":best_kodak_loss,
+                            "optimizer": optimizer.state_dict(),
+                            "aux_optimizer": aux_optimizer.state_dict() if aux_optimizer is not None else None,
+                            "lr_scheduler": lr_scheduler.state_dict(),
+                        },
+                        False, 
+                        out_dir = model_dir, 
+                        #filename=f"{str(args.lmbda).replace('0.','')}_checkpoint_best_kodak.pth.tar"
+                        filename=f"{args.nameRun}_checkpoint_best_kodak.pth.tar"
+                    )
+        else:
+
+            loss_tot_kodak, bpp_loss_kodak, mse_loss_kodak, aux_loss_kodak, psnr_kodak, ssim_kodak = test_epoch(epoch, kodak_dataloader, net, criterion, tag = 'Kodak')
+            if log_wandb:
+                wandb.log({
+                    "kodak/epoch":epoch,
+                    "kodak/loss": loss_tot_kodak,
+                    "kodak/bpp_loss": bpp_loss_kodak,
+                    "kodak/mse_loss": mse_loss_kodak,
+                    "kodak/aux_loss":aux_loss_kodak,
+                    "kodak/psnr":psnr_kodak,
+                    "kodak/mssim":ssim_kodak,
+                },step = epoch)   
+
+            # save best kodak model        
+            is_best_kodak = loss_tot_kodak < best_kodak_loss
+            best_kodak_loss = min(loss_tot_val, best_kodak_loss)
+            if(args.save and is_best_kodak):
+                save_checkpoint(
+                    {
+                        "epoch": epoch,
+                        "state_dict": net.state_dict(),
+                        "best_val_loss": best_val_loss,
+                        "best_kodak_loss":best_kodak_loss,
+                        "optimizer": optimizer.state_dict(),
+                        "aux_optimizer": aux_optimizer.state_dict() if aux_optimizer is not None else None,
+                        "lr_scheduler": lr_scheduler.state_dict(),
+                    },
+                    False, out_dir = args.save_dir, filename=f"{str(args.lmbda).replace('0.','')}_checkpoint_best_kodak.pth.tar"
+                )
+
 
 
         # try to estimate metrics with the real Arithmetic coding (AC) 
-        if epoch%10==0:
+        if epoch%5==0:
             bpp_list = []
             psnr_list = []
-            mssim_list = []       
+            mssim_list = []
+
+            ref_bpp_list = []
+            ref_psnr_list = []
+            ref_mssim_list = []         
 
             print("Make actual compression")
             net.update(force = True)
 
-            for index in range(len(amounts)):
-                # aplly the mask and lambda value
-                apply_saved_mask(net.g_a, all_mask[index])
+            if args.mask and args.model == "cheng":
+                for index in range(6):
 
-            bpp_ac, psnr_ac, mssim_ac = compress_one_epoch(net, kodak_dataloader, device)
-            bpp_list.append(bpp_ac)
-            psnr_list.append(psnr_ac)
-            mssim_list.append(mssim_ac)
+                    # aplly the mask 
+                    apply_saved_mask(net.g_a, all_mask["g_a"][index])
+                    apply_saved_mask(net.g_s, all_mask["g_s"][index])
 
-            if log_wandb:
-                wandb.log({
-                    f"kodak_compress/bpp_with_ac": bpp_ac,
-                    f"kodak_compress/psnr_with_ac": psnr_ac,
-                    f"kodak_compress/mssim_with_ac":mssim_ac
-                },step = epoch) 
+                    bpp_ac, psnr_ac, mssim_ac = compress_one_epoch(net, kodak_dataloader, device)
 
-            psnr_res = {}
-            mssim_res = {}
-            bpp_res = {} 
+                    delete_mask(net.g_a,parameters_to_prune["g_a"])
+                    delete_mask(net.g_s,parameters_to_prune["g_s"])
 
-            bpp_res["ours"] = bpp_list
-            psnr_res["ours"] = psnr_list
-            mssim_res["ours"] = mssim_list
+                    bpp_list.append(bpp_ac)
+                    psnr_list.append(psnr_ac)
+                    mssim_list.append(mssim_ac)
 
-            plot_rate_distorsion(bpp_res, psnr_res, epoch, eest="compression", metric = 'PSNR',save_fig=False, log_wandb=log_wandb)
-            plot_rate_distorsion(bpp_res, mssim_res, epoch, eest="compression_mssim", metric = 'MS-SSIM',save_fig=False, log_wandb=log_wandb, is_psnr=False)
+
+                    #Compute reference from cheng202_attn
+                    refnet = cheng2020_attn(quality=index+1,pretrained=True).to(device)
+                    ref_bpp_ac, ref_psnr_ac, ref_mssim_ac = compress_one_epoch(refnet, kodak_dataloader, device)
+
+                    ref_bpp_list.append(ref_bpp_ac)
+                    ref_psnr_list.append(ref_psnr_ac)
+                    ref_mssim_list.append(ref_mssim_ac)
+
+                # if log_wandb:
+                #     wandb.log({
+                #         f"kodak_compress/bpp_with_ac": bpp_ac,
+                #         f"kodak_compress/psnr_with_ac": psnr_ac,
+                #         f"kodak_compress/mssim_with_ac":mssim_ac
+                #     },step = epoch) 
+
+                psnr_res = {}
+                mssim_res = {}
+                bpp_res = {} 
+
+                bpp_res["ours"] = bpp_list
+                psnr_res["ours"] = psnr_list
+                mssim_res["ours"] = mssim_list
+                
+                bpp_res["cheng2020"] = ref_bpp_list
+                psnr_res["cheng2020"] = ref_psnr_list
+                mssim_res["cheng2020"] = ref_mssim_list
+
+                plot_rate_distorsion(bpp_res, psnr_res, 
+                                     epoch, eest="compression", 
+                                     metric = 'PSNR',
+                                     save_fig=True,
+                                     file_name=os.path.join(img_dir, f"{args.nameRun}_psnr_{epoch}.png"),
+                                     log_wandb=log_wandb)
+
+                plot_rate_distorsion(bpp_res, 
+                                    mssim_res, 
+                                    epoch, 
+                                    eest="compression_mssim", 
+                                    metric = 'MS-SSIM',
+                                    save_fig=True,
+                                    file_name=os.path.join(img_dir, f"{args.nameRun}_mssim_{epoch}.png"),
+                                    log_wandb=log_wandb, is_psnr=False)
+                
+
+                #Save data dictionnary
+                results = {"psnr": psnr_res,"mssim": mssim_res,"bpp": bpp_res}
+                file_path = os.path.join(res_dir, f"data_{args.nameRun}_{epoch}.json")
+                with open(file_path, "w") as f:
+                    json.dump(results, f)
     
     if log_wandb:
         wandb.run.finish()
 
-
+# file_name=f"{img_dir}/{args.nameRun}_psnr_{epoch}.png", 
+# file_name=f"{args.namerun}_mssim_{epoch}.png" ,
 if __name__ == "__main__":
     main()

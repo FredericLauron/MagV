@@ -31,7 +31,7 @@ from custom_comp.zoo import models
 
 from opt import parse_args
 
-from utils import train_one_epoch, test_epoch,compress_one_epoch, RateDistortionLoss, CustomDataParallel, configure_optimizers, save_checkpoint, seed_all, TestKodakDataset, generate_mask,save_mask, delete_mask,apply_saved_mask
+from utils import train_one_epoch, test_epoch,compress_one_epoch, RateDistortionLoss, CustomDataParallel, configure_optimizers, save_checkpoint, seed_all, TestKodakDataset, generate_mask_from_unstructured,save_mask, delete_mask,apply_saved_mask
 from evaluate import plot_rate_distorsion
 import os
 import wandb
@@ -220,8 +220,8 @@ def main():
     if args.mask and args.model=="cheng":
 
         #all_mask, parameters_to_prune = generate_mask(net.g_a, amounts)
-        all_mask["g_a"], parameters_to_prune["g_a"] = generate_mask(net.g_a, amounts)
-        all_mask["g_s"], parameters_to_prune["g_s"] = generate_mask(net.g_s, amounts)
+        all_mask["g_a"], parameters_to_prune["g_a"] = generate_mask_from_unstructured(net.g_a, amounts)
+        all_mask["g_s"], parameters_to_prune["g_s"] = generate_mask_from_unstructured(net.g_s, amounts)
         
         
         #save the mask    
@@ -229,6 +229,95 @@ def main():
             #json.dump(all_mask, f)
  
         torch.save(all_mask, f"{mask_dir}/mask_{args.nameRun}.pth")
+        torch.save(parameters_to_prune, f"{mask_dir}/parameters_to_prune_{args.nameRun}.pth")
+        
+    #########################################################################################################
+    ############################################### For baseline plot #######################################
+    #########################################################################################################
+    if args.mask and args.model == "cheng":
+        bpp_list = []
+        psnr_list = []
+        mssim_list = []
+
+        ref_bpp_list = []
+        ref_psnr_list = []
+        ref_mssim_list = []         
+
+        print("Make actual compression")
+        net.update(force = True)
+
+        if args.mask and args.model == "cheng":
+            for index in range(6):
+
+                # aplly the mask 
+                apply_saved_mask(net.g_a, all_mask["g_a"][index])
+                apply_saved_mask(net.g_s, all_mask["g_s"][index])
+
+                bpp_ac, psnr_ac, mssim_ac = compress_one_epoch(net, kodak_dataloader, device)
+
+                delete_mask(net.g_a,parameters_to_prune["g_a"])
+                delete_mask(net.g_s,parameters_to_prune["g_s"])
+
+                bpp_list.append(bpp_ac)
+                psnr_list.append(psnr_ac)
+                mssim_list.append(mssim_ac)
+
+
+                #Compute reference from cheng202_attn
+                refnet = cheng2020_attn(quality=index+1,pretrained=True).to(device)
+                ref_bpp_ac, ref_psnr_ac, ref_mssim_ac = compress_one_epoch(refnet, kodak_dataloader, device)
+
+                ref_bpp_list.append(ref_bpp_ac)
+                ref_psnr_list.append(ref_psnr_ac)
+                ref_mssim_list.append(ref_mssim_ac)
+
+            # if log_wandb:
+            #     wandb.log({
+            #         f"kodak_compress/bpp_with_ac": bpp_ac,
+            #         f"kodak_compress/psnr_with_ac": psnr_ac,
+            #         f"kodak_compress/mssim_with_ac":mssim_ac
+            #     },step = epoch) 
+
+            psnr_res = {}
+            mssim_res = {}
+            bpp_res = {} 
+
+            bpp_res["ours"] = bpp_list
+            psnr_res["ours"] = psnr_list
+            mssim_res["ours"] = mssim_list
+            
+            bpp_res["cheng2020"] = ref_bpp_list
+            psnr_res["cheng2020"] = ref_psnr_list
+            mssim_res["cheng2020"] = ref_mssim_list
+
+            plot_rate_distorsion(bpp_res, psnr_res, 
+                                -1, eest="compression", 
+                                metric = 'PSNR',
+                                save_fig=True,
+                                file_name=os.path.join(img_dir, f"{args.nameRun}_psnr_minus_1.png"),
+                                log_wandb=log_wandb)
+
+            plot_rate_distorsion(bpp_res, 
+                                mssim_res, 
+                                -1, 
+                                eest="compression_mssim", 
+                                metric = 'MS-SSIM',
+                                save_fig=True,
+                                file_name=os.path.join(img_dir, f"{args.nameRun}_mssim_minus_1.png"),
+                                log_wandb=log_wandb, is_psnr=False)
+            
+
+            #Save data dictionnary
+            results = {"psnr": psnr_res,"mssim": mssim_res,"bpp": bpp_res}
+            file_path = os.path.join(res_dir, f"data_{args.nameRun}_minus_1.json")
+            with open(file_path, "w") as f:
+                json.dump(results, f)
+
+    #########################################################################################################
+    #########################################################################################################
+    #########################################################################################################
+
+
 
 
     for epoch in range(last_epoch, args.epochs):

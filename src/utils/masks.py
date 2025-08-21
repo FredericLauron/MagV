@@ -48,7 +48,7 @@ def save_mask(model):
     return mask_dict
 
 
-def generate_mask(model,amounts:list):
+def generate_mask_from_unstructured(model,amounts:list):
     """ 
     Generates pruning masks for the model based on the specified amounts.
     Arguments:

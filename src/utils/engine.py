@@ -1,7 +1,7 @@
 import torch
 from utils.functions import compute_psnr, compute_metrics, compute_msssim
 from compressai.ops import compute_padding
-from utils.masks import delete_mask, save_mask, generate_mask,apply_saved_mask
+from utils.masks import delete_mask, save_mask, generate_mask_from_unstructured,apply_saved_mask
 
 from compressai.models.waseda import Cheng2020Attention
 

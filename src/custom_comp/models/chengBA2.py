@@ -2,13 +2,16 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 from torch.nn import Parameter
+from torch.hub import load_state_dict_from_url
 
 from compressai.layers.layers import conv3x3,conv1x1,subpel_conv3x3
 from compressai.layers.gdn import GDN
-from compressai.models.waseda import Cheng2020Anchor
+from compressai.models.waseda import Cheng2020Anchor,Cheng2020Attention
 from compressai.zoo.pretrained import load_pretrained
 
-from torch.hub import load_state_dict_from_url
+from itertools import chain
+
+
 
 class thresholdFunction(torch.autograd.Function):
     @staticmethod
@@ -23,13 +26,19 @@ class thresholdFunction(torch.autograd.Function):
 class BudgetAwareAdapter(nn.Module):
     def __init__(self,in_channels):
         super(BudgetAwareAdapter, self).__init__()
-        self.switch = Parameter(torch.ones(in_channels))
-
+        self.switch = Parameter(torch.ones(6,in_channels))
+        self.index = 0
 
     def forward(self, x):
-            switch = thresholdFunction.apply(self.switch)
-            x = x*switch.view(1,self.switch.size(0),1,1)
+            switch = thresholdFunction.apply(self.switch[self.index,:])
+            print("switch",switch)
+            print("index:", self.index)
+            print(self.switch.shape)
+            x = x*switch.view(1,switch.size(0),1,1)
             return x
+
+    def set_index(self,index):
+        self.index=index
     
 
 class ResidualBlockWithStride_BA2(nn.Module):
@@ -235,6 +244,19 @@ class Cheng2020Attention_BA2(Cheng2020Anchor):
             BudgetAwareAdapter(3),
         )
 
+    #Call before forward to change index
+    def set_index(self,index):
+        for m in chain(self.g_a.modules(), self.g_s.modules()):
+                if isinstance(m, BudgetAwareAdapter):
+                    m.set_index(index)
+        # for m in self.g_a.modules():
+        #     if isinstance(m,BudgetAwareAdapter):
+        #         m.set_index(index)
+        
+        # for m in self.g_s.modules():
+        #     if isinstance(m,BudgetAwareAdapter):
+        #         m.set_index(index)
+
     # Need to redefine this function to modify the call net.load_state_dict(state_dict)
     # to net.load_state_dict(state_dict,strict=False)
     # In this way, extra module, like adapters are ignored when loading the state_dict
@@ -248,6 +270,9 @@ class Cheng2020Attention_BA2(Cheng2020Anchor):
 
 
 def load_model(model):
+    """
+    Load model state dictionnary
+    """
     root_url = "https://compressai.s3.amazonaws.com/models/v1"
     url = f"{root_url}/cheng2020_attn-mse-6-730501f2.pth.tar"
 
@@ -258,10 +283,11 @@ def load_model(model):
 
     return model
 
-def copy_weights(model1,model2):
+def copy_weights(model1: Cheng2020Attention_BA2 ,model2:Cheng2020Attention):
     """
+    Copy the model state dictionnaty back to the original Cheng2020Attention model
     model1: cheng2020_BA2
-    model2: cheng2020_attn
+    model2: Cheng2020Attention
     """
     for (name1, module1) in model1.named_modules():
 

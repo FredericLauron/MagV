@@ -9,6 +9,7 @@ import torch.nn.functional as F
 
 from torch.profiler import profile, record_function, ProfilerActivity
 import sys
+import numpy as np
 
 class AverageMeter:
     """Compute running average."""
@@ -37,7 +38,8 @@ def train_one_epoch(
         args_mask=None,
         all_mask=None,
         lambda_list=None,
-        parameters_to_prune=None):
+        parameters_to_prune=None,
+        probs=None):
     
     model.train()
     device = next(model.parameters()).device
@@ -56,7 +58,9 @@ def train_one_epoch(
         # A mask is ramdomly selected (uniform distribution) from the list of masks.
         # The associated lambda is then selected from the lambda_list.     
         if args_mask is not None and isinstance(model, Cheng2020Attention) and lambda_list is not None:
-            index = torch.randint(0,6,(1,))
+            
+            index= np.random.choice(np.arange(6), p=probs)
+            #    index = torch.randint(0,6,(1,))
 
             lambda_value = lambda_list[index]
             #print("index:", index, "lambda_value:", lambda_value)

@@ -39,6 +39,6 @@ srun python train_structured.py   --batch-size=16 \
                                     --num-workers=30 \
                                     --mask \
                                     --maxPrunning=0.2 \
-                                    --nameRun=magv_02_structured
+                                    --nameRun=magv_02_global_structured
 # Print job completion time
 echo "Job finished at: $(date)"

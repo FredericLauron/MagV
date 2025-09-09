@@ -1,6 +1,7 @@
 import torch
 from torch.nn.utils import prune
 from collections import defaultdict
+import numpy as np
 
 def delete_mask(model,parameters_to_prune):
     """ 
@@ -75,7 +76,31 @@ def generate_mask_from_unstructured(model,amounts:list):
         model: The model for which to generate pruning masks.
         amounts: A list of amounts in % specifying the fraction of weights to prune.
         Returns:    
-            out_all_mask: A list of dictionaries containing the pruning masks for each amount.
+            out_all_mask: A list def adjust_sampling_distribution(bpp,psnr,probs,):
+    
+    #Compute the squared diff of bpp and psnr
+    bpp_diff = (np.array(bpp["ours"],dtype=np.float64)-np.array(bpp["cheng2020"],dtype=np.float64))**2
+    psnr_diff = (np.array(psnr["ours"],dtype=np.float64)-np.array(psnr["cheng2020"],dtype=np.float64))**2
+    
+    #Identify the indices where the diff is greater than a threshold
+    #Currently set to 0.1, can be adjusted
+    n = np.where(bpp_diff>0.1, 1.0, 0.0)
+    m = np.where(psnr_diff>0.1, 1.0, 0.0)
+
+    #Bitwise OR between the two masks    
+    f=np.bitwise_or(n.astype(bool), m.astype(bool)).astype(float)
+
+    # Update the probs
+    probs += f*0.1*bpp_diff*psnr_diff
+    #probs += f * 0.1 * (0.5 * bpp_diff + 0.5 * psnr_diff)
+    
+    # Normalize the probs
+    probs = probs / probs.sum()
+    
+    print("probs after normalization",probs)
+    print("probs sum after normalization",probs.sum())
+
+    return probsof dictionaries containing the pruning masks for each amount.
             parameters_to_prune: A list of tuples containing the modules and their parameters to prune.
     Raises:
         AssertionError: If the model is None or amounts is empty.
@@ -159,9 +184,14 @@ def group_by_module(neurons_to_prune):
 def build_and_put_mask_on_module(module_to_indices):
     for module, indices in module_to_indices.items():
 
-        mask = torch.ones_like(module.weight.data)
-        mask[indices] = 0  # zero out selected neurons
-        prune.custom_from_mask(module, name="weight", mask=mask)
+        # mask = torch.ones_like(module.weight.data)
+        # mask[indices] = 0  # zero out selected neurons
+        # prune.custom_from_mask(module, name="weight", mask=mask)
+        
+        amount = len(indices) / module.weight.data.size(0)
+        #print(f"Pruning {amount:.2%} of neurons in module {module}")
+        prune.ln_structured(module, name="weight", amount=amount, n=2, dim=0)
+
 
 def global_structured(parameters_to_prune,amount):
     
@@ -173,6 +203,9 @@ def global_structured(parameters_to_prune,amount):
     #Group them by module
     #Build the mask and put it on the module
     build_and_put_mask_on_module(group_by_module(get_neuron_to_prune(global_list, amount)))
+
+    #for module, _ in parameters_to_prune:
+        #prune.ln_structured(module, name="weight", amount=amount, n=2, dim=0)
 
 
 def generate_mask_from_structured(model,amounts:list):
@@ -213,3 +246,33 @@ def generate_mask_from_structured(model,amounts:list):
 ############################################################################################################################################
 ############################################################END STRUCTURED PRUNING##########################################################
 ############################################################################################################################################
+
+def adjust_sampling_distribution(bpp,psnr,probs):
+    
+    #Compute the squared diff of bpp and psnr
+    bpp_diff = np.abs((np.array(bpp["ours"],dtype=np.float64)-np.array(bpp["cheng2020"],dtype=np.float64)))
+    psnr_diff = np.abs((np.array(psnr["ours"],dtype=np.float64)-np.array(psnr["cheng2020"],dtype=np.float64)))
+    
+    #Identify the indices where the diff is greater than a threshold
+    #Currently set to 0.1, can be adjusted
+    n = np.where(bpp_diff>0.1, 1.0, 0.0)
+    m = np.where(psnr_diff>0.9, 1.0, 0.0)
+
+    #Bitwise OR between the two masks    
+    f=np.bitwise_or(n.astype(bool), m.astype(bool)).astype(float)
+
+    # Update the probs
+    #probs += f*0.1*bpp_diff*psnr_diff
+    #probs += f * 0.1 * (0.5 * bpp_diff + 0.5 * psnr_diff)
+    probs+=f*0.2
+    
+    # Clipping for security
+    probs = np.clip(probs, 1e-6, 1.0)
+
+    # Normalize the probs
+    probs = probs / probs.sum()
+    
+    print("probs after normalization",probs)
+    print("probs sum after normalization",probs.sum())
+
+    return probs

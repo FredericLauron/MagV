@@ -112,6 +112,7 @@ def parse_args():
     parser.add_argument("--mask", action="store_true",help="Apply pruning mask to the model")
     parser.add_argument("--maxPrunning", type=float,help="Percentage max of pruning of the model")
     parser.add_argument("--nameRun", type = str, default='Magv', help="name of the run")
+    parser.add_argument("--adjustDistrib", action="store_true",help="modifyng the sampling distribution of mask")
 
 
 

@@ -31,7 +31,7 @@ from custom_comp.zoo import models
 
 from opt import parse_args
 
-from utils import train_one_epoch, test_epoch,compress_one_epoch, RateDistortionLoss, CustomDataParallel, configure_optimizers, save_checkpoint, seed_all, TestKodakDataset, generate_mask_from_unstructured,save_mask, delete_mask,apply_saved_mask
+from utils import train_one_epoch, test_epoch,compress_one_epoch, RateDistortionLoss, CustomDataParallel, configure_optimizers, save_checkpoint, seed_all, TestKodakDataset, generate_mask_from_unstructured,save_mask, delete_mask,apply_saved_mask,adjust_sampling_distribution
 from evaluate import plot_rate_distorsion
 import os
 import wandb
@@ -216,6 +216,9 @@ def main():
     #amounts = [0.6,0.5,0.4,0.3,0.2,0.0] #[0.7, ...,0.0]
     amounts = np.linspace(0, args.maxPrunning, 6)[::-1]
     lambda_list = [0.0018,0.0035,0.0067,0.0130,0.0250,0.483]
+    
+    #adjustable distribution
+    probs = np.ones(len(amounts)) / len(amounts) 
 
     if args.mask and args.model=="cheng":
 
@@ -345,7 +348,8 @@ def main():
             args_mask=args.mask,
             all_mask=all_mask if args.mask and args.model=="cheng" else None,
             lambda_list=lambda_list if args.mask and args.model=="cheng" else None,
-            parameters_to_prune=parameters_to_prune if args.mask and args.model=="cheng" else None
+            parameters_to_prune=parameters_to_prune if args.mask and args.model=="cheng" else None,
+            probs=probs if args.adjustDistrib and args.mask else None
         )
 
         if log_wandb:
@@ -610,6 +614,9 @@ def main():
                 file_path = os.path.join(res_dir, f"data_{args.nameRun}_{epoch}.json")
                 with open(file_path, "w") as f:
                     json.dump(results, f)
+                
+                if args.adjustDistrib:
+                    probs=adjust_sampling_distribution(bpp_res,psnr_res,probs)
     
     if log_wandb:
         wandb.run.finish()

@@ -31,7 +31,7 @@ from custom_comp.zoo import models
 
 from opt import parse_args
 
-from utils import train_one_epoch, test_epoch,compress_one_epoch, RateDistortionLoss, CustomDataParallel, configure_optimizers, save_checkpoint, seed_all, TestKodakDataset, generate_mask_from_structured,save_mask, delete_mask,apply_saved_mask
+from utils import train_one_epoch, test_epoch,compress_one_epoch, RateDistortionLoss, CustomDataParallel, configure_optimizers, save_checkpoint, seed_all, TestKodakDataset, generate_mask_from_structured,save_mask, delete_mask,apply_saved_mask,generate_mask_from_structured_fisher
 from evaluate import plot_rate_distorsion
 import os
 import wandb
@@ -220,8 +220,12 @@ def main():
     if args.mask and args.model=="cheng":
 
         #all_mask, parameters_to_prune = generate_mask(net.g_a, amounts)
-        all_mask["g_a"], parameters_to_prune["g_a"] = generate_mask_from_structured(net.g_a, amounts)
-        all_mask["g_s"], parameters_to_prune["g_s"] = generate_mask_from_structured(net.g_s, amounts)
+        if args.fisher:
+            all_mask["g_a"], parameters_to_prune["g_a"] = generate_mask_from_structured_fisher(net,amounts,train_dataloader,criterion,net.g_a)
+            all_mask["g_s"], parameters_to_prune["g_s"] = generate_mask_from_structured_fisher(net,amounts,train_dataloader,criterion,net.g_s)
+        else:
+            all_mask["g_a"], parameters_to_prune["g_a"] = generate_mask_from_structured(net.g_a, amounts)
+            all_mask["g_s"], parameters_to_prune["g_s"] = generate_mask_from_structured(net.g_s, amounts)
         
         
         #save the mask    
@@ -345,7 +349,8 @@ def main():
             args_mask=args.mask,
             all_mask=all_mask if args.mask and args.model=="cheng" else None,
             lambda_list=lambda_list if args.mask and args.model=="cheng" else None,
-            parameters_to_prune=parameters_to_prune if args.mask and args.model=="cheng" else None
+            parameters_to_prune=parameters_to_prune if args.mask and args.model=="cheng" else None,
+            probs=None
         )
 
         if log_wandb:

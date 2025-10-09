@@ -13,6 +13,10 @@ __pycache__/
 # C extensions
 *.so
 
+#Folders
+imgs/
+src/draft/
+
 # Distribution / packaging
 .Python
 build/

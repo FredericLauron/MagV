@@ -1,9 +1,11 @@
 import torch
 from utils.functions import compute_psnr, compute_metrics, compute_msssim
 from compressai.ops import compute_padding
-from utils.masks import delete_mask, save_mask, generate_mask_from_unstructured,apply_saved_mask
+from utils.masks import delete_mask,apply_saved_mask
+from utils.chengBA2 import set_cheng2020Attention_index
 
 from compressai.models.waseda import Cheng2020Attention
+from custom_comp.models import Cheng2020Attention_BA2
 
 import torch.nn.functional as F
 
@@ -59,7 +61,7 @@ def train_one_epoch(
         # The associated lambda is then selected from the lambda_list.     
         if args_mask is not None and isinstance(model, Cheng2020Attention) and lambda_list is not None:
             
-            index= np.random.choice(np.arange(6), p=probs)
+            index = np.random.choice(np.arange(6), p=probs)
             #    index = torch.randint(0,6,(1,))
 
             lambda_value = lambda_list[index]
@@ -70,6 +72,28 @@ def train_one_epoch(
 
             criterion.lmbda = lambda_value
 
+        #Adapter
+        elif isinstance(model,Cheng2020Attention) and args_mask is None:
+            # Index selection. 
+            # An index is ramdomly selected (uniform distribution).
+            # The associated lambda is then selected from the lambda_list.     
+                
+            # Selection of the index    
+            index = np.random.choice(np.arange(6), p=probs)
+
+            # Selection of the relacted lambda value
+            lambda_value = lambda_list[index]
+
+            # Update the index in all the adapters
+            #model.set_index(index)
+            set_cheng2020Attention_index(model,index)
+
+            # Update the lambda in the optimizer
+            criterion.lmbda = lambda_value
+
+            print("Index has been set")
+            print(f"Adapter - index: {index}, lambda: {lambda_value}")
+
         optimizer.zero_grad()
         if aux_optimizer is not None:
             aux_optimizer.zero_grad()
@@ -77,32 +101,7 @@ def train_one_epoch(
         out_net = model(d)
 
         out_criterion = criterion(out_net, d)
-
-        # with profile(activities=[ProfilerActivity.CUDA],profile_memory=True, record_shapes=True) as prof:
-        #     out_criterion["loss"].backward()
-
-
-        # f = open("memory_vanilla.txt", "a")
-        # f.write(prof.key_averages().table())
-        # f.close()
-
-        # with torch.profiler.profile(
-        #     activities=[
-        #         torch.profiler.ProfilerActivity.CPU,
-        #         torch.profiler.ProfilerActivity.CUDA,
-        #     ],
-        #     with_flops=True) as prof:
-
-        #     out_criterion["loss"].backward()
-
-        # fw_flops = sum([int(evt.flops) for evt in prof.events()]) 
-
-        # print(fw_flops/(10**6))
-        # sys.exit(1)
-
         out_criterion["loss"].backward()
-
-            
 
         if clip_max_norm > 0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), clip_max_norm)
@@ -116,7 +115,7 @@ def train_one_epoch(
             aux_loss.backward()
             aux_optimizer.step()
 
-        if i % 100 == 0:
+        if i % 5 == 0:
             print(
                 f"Train epoch {epoch}: ["
                 f"{i*len(d)}/{len(train_dataloader.dataset)}"

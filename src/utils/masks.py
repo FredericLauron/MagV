@@ -2,6 +2,7 @@ import torch
 from torch.nn.utils import prune
 from collections import defaultdict
 import numpy as np
+from torch.utils.data import DataLoader, Subset, random_split
 
 def delete_mask(model,parameters_to_prune):
     """ 
@@ -137,22 +138,36 @@ def generate_mask_from_unstructured(model,amounts:list):
 
 def compute_neuron_norm(parameters_to_prune):
     norms = {}
+    local_medians = {}
+    nb_neuron = 0
     for module, _ in parameters_to_prune:
         W = module.weight.data
 
         if isinstance(module, torch.nn.Conv2d):
             # Norm per filter (output channel)
             neuron_norms = torch.norm(W.view(W.size(0), -1), p=2, dim=1)
+            # Nb neuron per filter
+            nb_neuron += W.shape[0]
   
 
         elif isinstance(module, torch.nn.Linear):
             # Norm per neuron (row of weight matrix)
             neuron_norms = torch.norm(W, p=2, dim=1)
+            # Nb neuron 
+            nb_neuron += W.shape[0]
 
+        #local median
+        local_medians[module] = neuron_norms.median()
+
+        #norms
         norms[module] = neuron_norms
+    
+    #global median
+    all_neurons = torch.cat(list(norms.values()))
+    global_median = all_neurons.median()
 
     # Normalization of the norms
-    norms = {k: v/len(norms) for k, v in norms.items()}
+    norms = {k: (v/local_medians[k])*global_median for k, v in norms.items()}
     
     return norms
 
@@ -195,7 +210,7 @@ def build_and_put_mask_on_module(module_to_indices):
 
 def global_structured(parameters_to_prune,amount):
     
-    #Compute neurons norms et recover the list of all neurons 
+    #Compute neurons norms et recover the list of all neurons :(module,neuron_norm),per module neuron_norm is a vector: [norm_neuron_1,norm_neuron_2,...,norm_neuron_n]
     #Structure of the list : (module, neuron_index, norm_value)
     global_list= get_global_list(compute_neuron_norm(parameters_to_prune))
 
@@ -276,3 +291,113 @@ def adjust_sampling_distribution(bpp,psnr,probs):
     print("probs sum after normalization",probs.sum())
 
     return probs
+
+
+
+############################################################################################################################################
+############################################################STRUCTURED PRUNING FISHER#######################################################
+############################################################################################################################################
+def compute_fisher_information(parameters_to_prune,model,dataloader,criterion):
+
+    #create a subset of the dataloader
+    dataset = dataloader.dataset
+    subset_dataset, _ = random_split(dataset, [1000, len(dataset) - 1000])
+    subset_loader = DataLoader(subset_dataset, batch_size=16, shuffle=True,pin_memory=True)
+    
+    model.eval()
+    # # Put all the parameters to require grads = False
+    # for parameter in model.parameters(): parameter.requires_grad = False
+    # # Put only relevant layers to require grads = True
+    # for parameter,_ in parameters_to_prune: parameter.requires_grad = True
+
+    device = next(model.parameters()).device
+
+    fisher_info = {}
+    # Forward pass
+    for i, d in enumerate(subset_loader):
+        
+        d=d.to(device)
+
+        # Zero gradients
+        model.zero_grad()
+
+        output = model(d)
+        loss = criterion(output,d)
+
+        # Compute gradients
+        loss["loss"].backward()
+
+        # Retrieve gradients
+        # Retrieve layers of interest (module,"weight")
+        for module,_ in parameters_to_prune:
+            # Retrieve gradients (name, parameter (weight/bias))
+            for name, p in module.named_parameters():
+
+                if p.requires_grad and name == 'weight':
+                    # Compute Fisher Information for the module/parameter
+                    module_fisher_grad=(p.grad.detach().clone())**2 # shape (out_c,in_c,k,k) -> (out_c,k,k)
+                    # Accumulate Fisher Information
+                    if module not in fisher_info:
+                        fisher_info[module] = torch.sum((module_fisher_grad + 1e-6),dim = (1,2,3)) # shape (out_c,k,k) -> (out_c)
+                    else:
+                        fisher_info[module] += torch.sum((module_fisher_grad + 1e-6),dim = (1,2,3)) # shape (out_c,k,k) -> (out_c)
+        
+    # Compute average Fisher Information over all samples
+    fisher_info = {k: (v/len(subset_dataset)) for k, v in fisher_info.items()}
+
+    return fisher_info
+
+def global_structured_fisher(parameters_to_prune,amount,model,dataloader,criterion):
+    
+    #Compute neurons norms et recover the list of all neurons :(module,neuron_norm),per module neuron_norm is a vector: [norm_neuron_1,norm_neuron_2,...,norm_neuron_n]
+    #Structure of the list : (module, neuron_index, norm_value)
+    global_list= get_global_list(compute_fisher_information(parameters_to_prune,model,dataloader,criterion))
+
+    #Get the list of neurons to prune
+    #Group them by module
+    #Build the mask and put it on the module
+    build_and_put_mask_on_module(group_by_module(get_neuron_to_prune(global_list, amount)))
+
+    #for module, _ in parameters_to_prune:
+        #prune.ln_structured(module, name="weight", amount=amount, n=2, dim=0)
+
+def generate_mask_from_structured_fisher(model,amounts:list,dataloader,criterion,submodel):
+    """ 
+    Generates pruning masks for the model based on the specified amounts.
+    Arguments:
+        model: The model for which to generate pruning masks.
+        amounts: A list of amounts in % specifying the fraction of weights to prune.
+        dataloader: The dataloader to use for computing Fisher information.
+        criterion: The loss function to use for computing Fisher information.
+        submodel: The submodel to which the masks will be applied.
+        Returns:    
+            out_all_mask: A list of dictionaries containing the pruning masks for each amount.
+            parameters_to_prune: A list of tuples containing the modules and their parameters to prune.
+    Raises:
+        AssertionError: If the model is None or amounts is empty.
+    """
+    # checks
+    assert model is not None
+    assert amounts is not None and len(amounts) > 0
+
+    #register all the parameters for the model that are available for pruning
+    parameters_to_prune = [(module, "weight") for module in filter(lambda m: type(m) in [torch.nn.Conv2d, torch.nn.Linear], submodel.modules())]
+
+    out_all_mask = []
+
+    for index in amounts:
+
+        # generate the pruning masks
+        #prune.global_unstructured(parameters_to_prune, pruning_method=prune.L1Unstructured,amount=index)
+        #global_structured_fisher(parameters_to_prune, index)
+        global_structured_fisher(parameters_to_prune,index,model,dataloader,criterion)
+        # Save pruning masks
+        out_all_mask.append(save_mask(submodel))
+
+        #cleaning the pruning masks from the model
+        delete_mask(submodel, parameters_to_prune)
+
+    return out_all_mask ,parameters_to_prune
+############################################################################################################################################
+############################################################END STRUCTURED PRUNING FISHER###################################################
+############################################################################################################################################

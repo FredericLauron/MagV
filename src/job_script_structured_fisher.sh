@@ -2,7 +2,7 @@
 #SBATCH --job-name=magv             # Name of your job
 #SBATCH --output=%x_%j.out            # Output file (%x for job name, %j for job ID)
 #SBATCH --error=%x_%j.err             # Error file
-#SBARCH --nodelist=nodemm06          # Specify a particular node (optional)
+#SBATCH --partition=L40S              # Partition to submit to (A100, V100, etc.)
 
 #SBATCH --gres=gpu:1                  # Request 1 GPU
 #SBATCH --cpus-per-task=30             # Request 8 CPU cores
@@ -39,6 +39,7 @@ srun python train_structured.py   --batch-size=16 \
                                     --num-workers=30 \
                                     --mask \
                                     --maxPrunning=0.4 \
-                                    --nameRun=magv_04_gs_median
+                                    --nameRun=magv_04_gs_fisher \
+                                    --fisher
 # Print job completion time
 echo "Job finished at: $(date)"

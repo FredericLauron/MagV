@@ -25,4 +25,5 @@ models = {
     'stf': SymmetricalTransFormer,
     'cnn': WACNN,
     'cheng': lambda:cheng2020_attn(quality=6,pretrained=True),
+    'chengBA2': Cheng2020Attention_BA2,
 }

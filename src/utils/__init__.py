@@ -8,8 +8,8 @@ from .engine import test_epoch,train_one_epoch, compress_one_epoch
 from .loss import RateDistortionLoss
 from .dataset import TestKodakDataset
 from .functions import compute_metrics, compute_msssim, compute_psnr
-from .masks import delete_mask, save_mask, generate_mask_from_unstructured,apply_saved_mask,generate_mask_from_structured,adjust_sampling_distribution
-
+from .masks import delete_mask, save_mask, generate_mask_from_unstructured,apply_saved_mask,generate_mask_from_structured,adjust_sampling_distribution,generate_mask_from_structured_fisher
+from .chengBA2 import get_Cheng2020Attention_with_conv_switch, set_cheng2020Attention_index,frozen_cheng2020Attention
 import random
 import os
 import numpy as np

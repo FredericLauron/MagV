@@ -113,6 +113,7 @@ def parse_args():
     parser.add_argument("--maxPrunning", type=float,help="Percentage max of pruning of the model")
     parser.add_argument("--nameRun", type = str, default='Magv', help="name of the run")
     parser.add_argument("--adjustDistrib", action="store_true",help="modifyng the sampling distribution of mask")
+    parser.add_argument("--fisher", action="store_true",help="compute neuron fisher information")
 
 
 

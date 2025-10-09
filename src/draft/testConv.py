@@ -56,22 +56,28 @@ check_neuron_sparsity(parameters_to_prune)
 
 def compute_neuron_norm(parameters_to_prune):
     norms = {}
+    nb_neuron = 0
     for module, _ in parameters_to_prune:
         W = module.weight.data
 
         if isinstance(module, torch.nn.Conv2d):
             # Norm per filter (output channel)
             neuron_norms = torch.norm(W.view(W.size(0), -1), p=2, dim=1)
+            # Nb neuron per filter
+            nb_neuron += W.shape[0]
+
   
 
         elif isinstance(module, torch.nn.Linear):
             # Norm per neuron (row of weight matrix)
             neuron_norms = torch.norm(W, p=2, dim=1)
+            # Nb neuron 
+            nb_neuron += W.shape[0]
 
         norms[module] = neuron_norms
 
     # Normalization of the norms
-    norms = {k: v/len(norms) for k, v in norms.items()}
+    norms = {k: v/nb_neuron for k, v in norms.items()}
     
     return norms
 

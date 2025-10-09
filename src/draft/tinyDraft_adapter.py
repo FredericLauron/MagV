@@ -1,14 +1,13 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn import Parameter
 from compressai.zoo import cheng2020_attn
 
 
 import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from custom_comp.models import Cheng2020Attention_BA2
-from custom_comp.models.chengBA2 import *
+from MagV.src.custom_comp.models.chengBA2_old import *
 
 # class thresholdFunction(torch.autograd.Function):
 #     @staticmethod

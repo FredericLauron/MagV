@@ -138,7 +138,7 @@ def generate_mask_from_unstructured(model,amounts:list):
 
 def compute_neuron_norm(parameters_to_prune):
     norms = {}
-    local_medians = {}
+    #local_medians = {}
     nb_neuron = 0
     for module, _ in parameters_to_prune:
         W = module.weight.data
@@ -157,7 +157,7 @@ def compute_neuron_norm(parameters_to_prune):
             nb_neuron += W.shape[0]
 
         #local median
-        local_medians[module] = neuron_norms.median()
+        #local_medians[module] = neuron_norms.median()
 
         #norms
         norms[module] = neuron_norms
@@ -167,7 +167,8 @@ def compute_neuron_norm(parameters_to_prune):
     global_median = all_neurons.median()
 
     # Normalization of the norms
-    norms = {k: (v/local_medians[k])*global_median for k, v in norms.items()}
+    #norms = {k: (v/local_medians[k])*global_median for k, v in norms.items()}
+    norms = {k: v/nb_neuron for k, v in norms.items()}
     
     return norms
 
@@ -203,6 +204,7 @@ def build_and_put_mask_on_module(module_to_indices):
         # mask[indices] = 0  # zero out selected neurons
         # prune.custom_from_mask(module, name="weight", mask=mask)
         
+        # Number of neuron to prune / total number of neuron of the module
         amount = len(indices) / module.weight.data.size(0)
         #print(f"Pruning {amount:.2%} of neurons in module {module}")
         prune.ln_structured(module, name="weight", amount=amount, n=2, dim=0)
@@ -401,3 +403,19 @@ def generate_mask_from_structured_fisher(model,amounts:list,dataloader,criterion
 ############################################################################################################################################
 ############################################################END STRUCTURED PRUNING FISHER###################################################
 ############################################################################################################################################
+
+def lambda_percentage(alpha,amount):
+    """
+    Computes the percentage mapping based on the exponential mapping of lambda values.
+    The number of points is determined by the length of the input alpha list.
+    Arguments:
+        alpha: [list] The input alpha values.
+        amount: [float] The total amount for scaling. (ex: 0.6 for 60%)
+    Returns:
+        lambda_values: The computed lambda values.
+        percentage: The computed percentage values."""
+    lambda_max = 0.0483
+    lambda_min = 0.0018
+    lambda_values = np.exp(np.log(lambda_max) * (1 - alpha / amount) + np.log(lambda_min) * (alpha / amount))
+
+    return lambda_values,amount * (lambda_max - lambda_values) / (lambda_max - lambda_min)

@@ -31,7 +31,10 @@ from custom_comp.zoo import models
 
 from opt import parse_args
 
-from utils import train_one_epoch, test_epoch,compress_one_epoch, RateDistortionLoss, CustomDataParallel, configure_optimizers, save_checkpoint, seed_all, TestKodakDataset, generate_mask_from_unstructured,save_mask, delete_mask,apply_saved_mask,adjust_sampling_distribution
+from utils import train_one_epoch, test_epoch,compress_one_epoch, RateDistortionLoss, \
+    CustomDataParallel, configure_optimizers, save_checkpoint, seed_all, \
+        TestKodakDataset, generate_mask_from_unstructured,save_mask, \
+            delete_mask,apply_saved_mask,adjust_sampling_distribution,lambda_percentage
 from evaluate import plot_rate_distorsion
 import os
 import wandb
@@ -214,9 +217,12 @@ def main():
     all_mask={}
     parameters_to_prune={}
     #amounts = [0.6,0.5,0.4,0.3,0.2,0.0] #[0.7, ...,0.0]
-    amounts = np.linspace(0, args.maxPrunning, 6)[::-1]
-    lambda_list = [0.0018,0.0035,0.0067,0.0130,0.0250,0.483]
-    
+    # amounts = np.linspace(0, args.maxPrunning, 6)[::-1]
+    # lambda_list = [0.0018,0.0035,0.0067,0.0130,0.0250,0.483]
+
+    alpha = np.linspace(0, args.maxPrunning, args.maxPoint)[::-1]
+    lambda_list , amounts = lambda_percentage(alpha, amount = args.maxPrunning)
+
     #adjustable distribution
     probs = np.ones(len(amounts)) / len(amounts) 
 
@@ -349,7 +355,7 @@ def main():
             all_mask=all_mask if args.mask and args.model=="cheng" else None,
             lambda_list=lambda_list if args.mask and args.model=="cheng" else None,
             parameters_to_prune=parameters_to_prune if args.mask and args.model=="cheng" else None,
-            probs=probs if args.adjustDistrib and args.mask else None
+            probs=None
         )
 
         if log_wandb:

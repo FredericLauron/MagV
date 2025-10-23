@@ -61,7 +61,7 @@ def train_one_epoch(
         # The associated lambda is then selected from the lambda_list.     
         if args_mask is not None and isinstance(model, Cheng2020Attention) and lambda_list is not None:
             
-            index = np.random.choice(np.arange(6), p=probs)
+            index = np.random.choice(np.arange(len(lambda_list)), p=probs)
             #    index = torch.randint(0,6,(1,))
 
             lambda_value = lambda_list[index]
@@ -91,8 +91,8 @@ def train_one_epoch(
             # Update the lambda in the optimizer
             criterion.lmbda = lambda_value
 
-            print("Index has been set")
-            print(f"Adapter - index: {index}, lambda: {lambda_value}")
+            # print("Index has been set")
+            # print(f"Adapter - index: {index}, lambda: {lambda_value}")
 
         optimizer.zero_grad()
         if aux_optimizer is not None:

@@ -110,12 +110,15 @@ def parse_args():
     parser.add_argument("--lora-opt", type = str, default='adam', choices=['adam','sgd'])
     parser.add_argument("--lora-sched", type = str, default='lr_plateau', choices=['lr_plateau','cosine'])
     parser.add_argument("--mask", action="store_true",help="Apply pruning mask to the model")
-    parser.add_argument("--maxPrunning", type=float,help="Percentage max of pruning of the model")
+    
     parser.add_argument("--nameRun", type = str, default='Magv', help="name of the run")
     parser.add_argument("--adjustDistrib", action="store_true",help="modifyng the sampling distribution of mask")
     parser.add_argument("--fisher", action="store_true",help="compute neuron fisher information")
 
-
+    parser.add_argument("--alpha", type=int,help="LoRA scale factor")
+    parser.add_argument("--rank", type=int,help="LoRA rank")
+    parser.add_argument("--maxPoint", type=int, default=6, help="Maximum point on the RD curve")
+    parser.add_argument("--maxPrunning", type=float, default=0.6, help="Maximum prunning amount")
 
 
 

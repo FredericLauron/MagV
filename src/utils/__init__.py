@@ -4,12 +4,17 @@ import torch.optim as optim
 import torch
 import shutil
 
-from .engine import test_epoch,train_one_epoch, compress_one_epoch
+from .engine import test_epoch,train_one_epoch, compress_one_epoch, AverageMeter,pad,crop
 from .loss import RateDistortionLoss
 from .dataset import TestKodakDataset
 from .functions import compute_metrics, compute_msssim, compute_psnr
-from .masks import delete_mask, save_mask, generate_mask_from_unstructured,apply_saved_mask,generate_mask_from_structured,adjust_sampling_distribution,generate_mask_from_structured_fisher
-from .chengBA2 import get_Cheng2020Attention_with_conv_switch, set_cheng2020Attention_index,frozen_cheng2020Attention
+from .masks import delete_mask, save_mask, generate_mask_from_unstructured,\
+    apply_saved_mask,generate_mask_from_structured,adjust_sampling_distribution,\
+    generate_mask_from_structured_fisher,lambda_percentage
+
+#from .chengBA2_old import get_Cheng2020Attention_with_conv_switch, set_cheng2020Attention_index,frozen_cheng2020Attention
+from .chengBA2 import frozen_cheng2020Attention, get_Cheng2020Attention_with_conv_switch,\
+      set_cheng2020Attention_index,ConvWithAdapterSwitch,SubpelConvWithAdapterSwitch
 import random
 import os
 import numpy as np

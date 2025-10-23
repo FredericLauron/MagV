@@ -38,8 +38,9 @@ srun python train_unstructured.py   --batch-size=16 \
                                     --vanilla-adapt=1 \
                                     --num-workers=30 \
                                     --mask \
-                                    --maxPrunning=0.6 \
-                                    --nameRun=magv_06_unstructured_VariSampling_4 \
-                                    --adjustDistrib
+                                    --maxPrunning=0.4 \
+                                    --nameRun=magv_04_unstructured_exp_perc \
+                                    --maxPoint=6
+                                    
 # Print job completion time
 echo "Job finished at: $(date)"

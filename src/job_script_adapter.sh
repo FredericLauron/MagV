@@ -38,6 +38,8 @@ srun python train_adapter.py   --batch-size=16 \
                                     --vanilla-adapt=1 \
                                     --num-workers=30 \
                                     --mask \
-                                    --nameRun=magv_BA2_adapter
+                                    --nameRun=magv_BA2_adapter_alpha1 \
+                                    --alpha=1 \
+                                    --rank=8
 # Print job completion time
 echo "Job finished at: $(date)"

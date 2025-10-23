@@ -31,7 +31,10 @@ from custom_comp.zoo import models
 
 from opt import parse_args
 
-from utils import train_one_epoch, test_epoch,compress_one_epoch, RateDistortionLoss, CustomDataParallel, configure_optimizers, save_checkpoint, seed_all, TestKodakDataset, generate_mask_from_structured,save_mask, delete_mask,apply_saved_mask,generate_mask_from_structured_fisher
+from utils import train_one_epoch, test_epoch,compress_one_epoch, \
+    RateDistortionLoss, CustomDataParallel, configure_optimizers, save_checkpoint,\
+          seed_all, TestKodakDataset, generate_mask_from_structured,save_mask, delete_mask,\
+            apply_saved_mask,generate_mask_from_structured_fisher,lambda_percentage
 from evaluate import plot_rate_distorsion
 import os
 import wandb
@@ -214,8 +217,13 @@ def main():
     all_mask={}
     parameters_to_prune={}
     #amounts = [0.6,0.5,0.4,0.3,0.2,0.0] #[0.7, ...,0.0]
-    amounts = np.linspace(0, args.maxPrunning, 6)[::-1]
-    lambda_list = [0.0018,0.0035,0.0067,0.0130,0.0250,0.483]
+    
+    # lambda values on the ray distortion curve
+    # can be more tha 6 values 
+    #lambda_list = [0.0018,0.0025,0.0035,0.0067,0.0130,0.0250,0.0348,0.483]
+    alpha = np.linspace(0, args.maxPrunning, args.maxPoint)[::-1]
+    lambda_list , amounts = lambda_percentage(alpha, amount = args.maxPrunning)
+    
 
     if args.mask and args.model=="cheng":
 
@@ -251,7 +259,7 @@ def main():
         net.update(force = True)
 
         if args.mask and args.model == "cheng":
-            for index in range(6):
+            for index in range(len(lambda_list)):
 
                 # aplly the mask 
                 apply_saved_mask(net.g_a, all_mask["g_a"][index])
@@ -266,8 +274,7 @@ def main():
                 psnr_list.append(psnr_ac)
                 mssim_list.append(mssim_ac)
 
-
-                #Compute reference from cheng202_attn
+            for index in range(6):
                 refnet = cheng2020_attn(quality=index+1,pretrained=True).to(device)
                 ref_bpp_ac, ref_psnr_ac, ref_mssim_ac = compress_one_epoch(refnet, kodak_dataloader, device)
 
@@ -275,12 +282,14 @@ def main():
                 ref_psnr_list.append(ref_psnr_ac)
                 ref_mssim_list.append(ref_mssim_ac)
 
-            # if log_wandb:
-            #     wandb.log({
-            #         f"kodak_compress/bpp_with_ac": bpp_ac,
-            #         f"kodak_compress/psnr_with_ac": psnr_ac,
-            #         f"kodak_compress/mssim_with_ac":mssim_ac
-            #     },step = epoch) 
+            # # refnet interpollation for index 1 and 6
+            #     ref_bpp_list[1] = ref_bpp_list[0]+(0.0025-0.0018)/(0.0035-0.0018)*(ref_bpp_list[1]-ref_bpp_list[0])
+            #     ref_psnr_list[1] = ref_psnr_list[0]+(0.0025-0.0018)/(0.0035-0.0018)*(ref_psnr_list[1]-ref_psnr_list[0])
+            #     ref_mssim_list[1] = ref_mssim_list[0]+(0.0025-0.0018)/(0.0035-0.0018)*(ref_mssim_list[1]-ref_mssim_list[0])    
+
+            #     ref_bpp_list[6] = ref_bpp_list[5]+(0.0348-0.0250)/(0.0483-0.0250)*(ref_bpp_list[6]-ref_bpp_list[5])
+            #     ref_psnr_list[6] = ref_psnr_list[5]+(0.0348-0.0250)/(0.0483-0.0250)*(ref_psnr_list[6]-ref_psnr_list[5])
+            #     ref_mssim_list[6] = ref_mssim_list[5]+(0.0348-0.0250)/(0.0483-0.0250)*(ref_mssim_list[6]-ref_mssim_list[5])          
 
             psnr_res = {}
             mssim_res = {}
@@ -550,7 +559,7 @@ def main():
             net.update(force = True)
 
             if args.mask and args.model == "cheng":
-                for index in range(6):
+                for index in range(len(lambda_list)):
 
                     # aplly the mask 
                     apply_saved_mask(net.g_a, all_mask["g_a"][index])
@@ -564,9 +573,8 @@ def main():
                     bpp_list.append(bpp_ac)
                     psnr_list.append(psnr_ac)
                     mssim_list.append(mssim_ac)
-
-
-                    #Compute reference from cheng202_attn
+                
+                for index in range(6): 
                     refnet = cheng2020_attn(quality=index+1,pretrained=True).to(device)
                     ref_bpp_ac, ref_psnr_ac, ref_mssim_ac = compress_one_epoch(refnet, kodak_dataloader, device)
 
@@ -574,12 +582,13 @@ def main():
                     ref_psnr_list.append(ref_psnr_ac)
                     ref_mssim_list.append(ref_mssim_ac)
 
-                # if log_wandb:
-                #     wandb.log({
-                #         f"kodak_compress/bpp_with_ac": bpp_ac,
-                #         f"kodak_compress/psnr_with_ac": psnr_ac,
-                #         f"kodak_compress/mssim_with_ac":mssim_ac
-                #     },step = epoch) 
+                # ref_bpp_list[1] = ref_bpp_list[0]+(0.0025-0.0018)/(0.0035-0.0018)*(ref_bpp_list[1]-ref_bpp_list[0])
+                # ref_psnr_list[1] = ref_psnr_list[0]+(0.0025-0.0018)/(0.0035-0.0018)*(ref_psnr_list[1]-ref_psnr_list[0])
+                # ref_mssim_list[1] = ref_mssim_list[0]+(0.0025-0.0018)/(0.0035-0.0018)*(ref_mssim_list[1]-ref_mssim_list[0])    
+
+                # ref_bpp_list[6] = ref_bpp_list[5]+(0.0348-0.0250)/(0.0483-0.0250)*(ref_bpp_list[6]-ref_bpp_list[5])
+                # ref_psnr_list[6] = ref_psnr_list[5]+(0.0348-0.0250)/(0.0483-0.0250)*(ref_psnr_list[6]-ref_psnr_list[5])
+                # ref_mssim_list[6] = ref_mssim_list[5]+(0.0348-0.0250)/(0.0483-0.0250)*(ref_mssim_list[6]-ref_mssim_list[5])   
 
                 psnr_res = {}
                 mssim_res = {}

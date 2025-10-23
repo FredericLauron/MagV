@@ -18,7 +18,8 @@ from custom_comp.models import SymmetricalTransFormer, WACNN, Cheng2020Attention
 
 from .pretrained import load_pretrained as load_state_dict
 from compressai.models.waseda import Cheng2020Attention
-from compressai.zoo import cheng2020_attn
+from compressai.models.google import MeanScaleHyperprior
+from compressai.zoo import cheng2020_attn,mbt2018_mean
 # from compressai.zoo.pretrained import load_pretrained
 
 models = {
@@ -26,4 +27,5 @@ models = {
     'cnn': WACNN,
     'cheng': lambda:cheng2020_attn(quality=6,pretrained=True),
     'chengBA2': Cheng2020Attention_BA2,
+    'mean_scale_hyperprior': lambda:mbt2018_mean(quality=6,pretrained=True), # TODO same as cheng2020
 }

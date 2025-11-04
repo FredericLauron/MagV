@@ -221,7 +221,7 @@ def main():
     # lambda values on the ray distortion curve
     # can be more tha 6 values 
     #lambda_list = [0.0018,0.0025,0.0035,0.0067,0.0130,0.0250,0.0348,0.483]
-    alpha = np.linspace(0, args.maxPrunning, args.maxPoint)[::-1]
+    alpha = np.linspace(0.0, args.maxPrunning, args.maxPoint)[::-1]
     lambda_list , amounts = lambda_percentage(alpha, amount = args.maxPrunning)
     
 
@@ -261,15 +261,20 @@ def main():
         if args.mask and args.model == "cheng":
             for index in range(len(lambda_list)):
 
-                # aplly the mask 
-                apply_saved_mask(net.g_a, all_mask["g_a"][index])
-                apply_saved_mask(net.g_s, all_mask["g_s"][index])
+                if index != len(lambda_list)-1:
+                     
+                    apply_saved_mask(net.g_a, all_mask["g_a"][index])
+                    apply_saved_mask(net.g_s, all_mask["g_s"][index])
 
-                bpp_ac, psnr_ac, mssim_ac = compress_one_epoch(net, kodak_dataloader, device)
+                    bpp_ac, psnr_ac, mssim_ac = compress_one_epoch(net, kodak_dataloader, device)
 
-                delete_mask(net.g_a,parameters_to_prune["g_a"])
-                delete_mask(net.g_s,parameters_to_prune["g_s"])
+                    delete_mask(net.g_a,parameters_to_prune["g_a"])
+                    delete_mask(net.g_s,parameters_to_prune["g_s"])
 
+                # No mask for 0.483 lambda 0.0 amount pruning   
+                else:
+                    bpp_ac, psnr_ac, mssim_ac = compress_one_epoch(net, kodak_dataloader, device)
+                
                 bpp_list.append(bpp_ac)
                 psnr_list.append(psnr_ac)
                 mssim_list.append(mssim_ac)
@@ -281,15 +286,6 @@ def main():
                 ref_bpp_list.append(ref_bpp_ac)
                 ref_psnr_list.append(ref_psnr_ac)
                 ref_mssim_list.append(ref_mssim_ac)
-
-            # # refnet interpollation for index 1 and 6
-            #     ref_bpp_list[1] = ref_bpp_list[0]+(0.0025-0.0018)/(0.0035-0.0018)*(ref_bpp_list[1]-ref_bpp_list[0])
-            #     ref_psnr_list[1] = ref_psnr_list[0]+(0.0025-0.0018)/(0.0035-0.0018)*(ref_psnr_list[1]-ref_psnr_list[0])
-            #     ref_mssim_list[1] = ref_mssim_list[0]+(0.0025-0.0018)/(0.0035-0.0018)*(ref_mssim_list[1]-ref_mssim_list[0])    
-
-            #     ref_bpp_list[6] = ref_bpp_list[5]+(0.0348-0.0250)/(0.0483-0.0250)*(ref_bpp_list[6]-ref_bpp_list[5])
-            #     ref_psnr_list[6] = ref_psnr_list[5]+(0.0348-0.0250)/(0.0483-0.0250)*(ref_psnr_list[6]-ref_psnr_list[5])
-            #     ref_mssim_list[6] = ref_mssim_list[5]+(0.0348-0.0250)/(0.0483-0.0250)*(ref_mssim_list[6]-ref_mssim_list[5])          
 
             psnr_res = {}
             mssim_res = {}
@@ -376,13 +372,19 @@ def main():
         ############################################################################
         if args.mask and args.model=="cheng":
             total_losses=[]
-            for i in range(len(amounts)):
+            for i in range(len(lambda_list)):
 
-                apply_saved_mask(net.g_a,all_mask["g_a"][i])
-                apply_saved_mask(net.g_s,all_mask["g_s"][i])
-                loss_tot_val, bpp_loss_val, mse_loss_val, aux_loss_val, psnr_val, ssim_val = test_epoch(epoch, val_dataloader, net, criterion, tag = 'Val')
-                delete_mask(net.g_a,parameters_to_prune["g_a"])
-                delete_mask(net.g_s,parameters_to_prune["g_s"])
+                if i != len(lambda_list)-1:
+
+                    apply_saved_mask(net.g_a,all_mask["g_a"][i])
+                    apply_saved_mask(net.g_s,all_mask["g_s"][i])
+
+                    loss_tot_val, bpp_loss_val, mse_loss_val, aux_loss_val, psnr_val, ssim_val = test_epoch(epoch, val_dataloader, net, criterion, tag = 'Val')
+                    
+                    delete_mask(net.g_a,parameters_to_prune["g_a"])
+                    delete_mask(net.g_s,parameters_to_prune["g_s"])
+                else:
+                    loss_tot_val, bpp_loss_val, mse_loss_val, aux_loss_val, psnr_val, ssim_val = test_epoch(epoch, val_dataloader, net, criterion, tag = 'Val')
 
                 if log_wandb:
                     wandb.log({
@@ -470,13 +472,19 @@ def main():
         ############################################################################
         if args.mask and args.model=="cheng" :
                 total_losses_kodak=[]
-                for i in range(len(amounts)):
+                for i in range(len(lambda_list)):
 
-                    apply_saved_mask(net.g_a,all_mask["g_a"][i])
-                    apply_saved_mask(net.g_s,all_mask["g_s"][i])
-                    loss_tot_kodak, bpp_loss_kodak, mse_loss_kodak, aux_loss_kodak, psnr_kodak, ssim_kodak = test_epoch(epoch, kodak_dataloader, net, criterion, tag = 'Kodak')
-                    delete_mask(net.g_a,parameters_to_prune["g_a"])
-                    delete_mask(net.g_s,parameters_to_prune["g_s"])
+                    if i != len(lambda_list)-1:
+
+                        apply_saved_mask(net.g_a,all_mask["g_a"][i])
+                        apply_saved_mask(net.g_s,all_mask["g_s"][i])
+
+                        loss_tot_kodak, bpp_loss_kodak, mse_loss_kodak, aux_loss_kodak, psnr_kodak, ssim_kodak = test_epoch(epoch, kodak_dataloader, net, criterion, tag = 'Kodak')
+                        
+                        delete_mask(net.g_a,parameters_to_prune["g_a"])
+                        delete_mask(net.g_s,parameters_to_prune["g_s"])
+                    else:
+                        loss_tot_kodak, bpp_loss_kodak, mse_loss_kodak, aux_loss_kodak, psnr_kodak, ssim_kodak = test_epoch(epoch, kodak_dataloader, net, criterion, tag = 'Kodak')
 
                     if log_wandb:
                         wandb.log({
@@ -561,15 +569,20 @@ def main():
             if args.mask and args.model == "cheng":
                 for index in range(len(lambda_list)):
 
-                    # aplly the mask 
-                    apply_saved_mask(net.g_a, all_mask["g_a"][index])
-                    apply_saved_mask(net.g_s, all_mask["g_s"][index])
+                    if index != len(lambda_list)-1:
+                        
+                        apply_saved_mask(net.g_a, all_mask["g_a"][index])
+                        apply_saved_mask(net.g_s, all_mask["g_s"][index])
 
-                    bpp_ac, psnr_ac, mssim_ac = compress_one_epoch(net, kodak_dataloader, device)
+                        bpp_ac, psnr_ac, mssim_ac = compress_one_epoch(net, kodak_dataloader, device)
 
-                    delete_mask(net.g_a,parameters_to_prune["g_a"])
-                    delete_mask(net.g_s,parameters_to_prune["g_s"])
+                        delete_mask(net.g_a,parameters_to_prune["g_a"])
+                        delete_mask(net.g_s,parameters_to_prune["g_s"])
 
+                    # No mask for 0.483 lambda    
+                    else:
+                        bpp_ac, psnr_ac, mssim_ac = compress_one_epoch(net, kodak_dataloader, device)
+                
                     bpp_list.append(bpp_ac)
                     psnr_list.append(psnr_ac)
                     mssim_list.append(mssim_ac)
@@ -581,14 +594,6 @@ def main():
                     ref_bpp_list.append(ref_bpp_ac)
                     ref_psnr_list.append(ref_psnr_ac)
                     ref_mssim_list.append(ref_mssim_ac)
-
-                # ref_bpp_list[1] = ref_bpp_list[0]+(0.0025-0.0018)/(0.0035-0.0018)*(ref_bpp_list[1]-ref_bpp_list[0])
-                # ref_psnr_list[1] = ref_psnr_list[0]+(0.0025-0.0018)/(0.0035-0.0018)*(ref_psnr_list[1]-ref_psnr_list[0])
-                # ref_mssim_list[1] = ref_mssim_list[0]+(0.0025-0.0018)/(0.0035-0.0018)*(ref_mssim_list[1]-ref_mssim_list[0])    
-
-                # ref_bpp_list[6] = ref_bpp_list[5]+(0.0348-0.0250)/(0.0483-0.0250)*(ref_bpp_list[6]-ref_bpp_list[5])
-                # ref_psnr_list[6] = ref_psnr_list[5]+(0.0348-0.0250)/(0.0483-0.0250)*(ref_psnr_list[6]-ref_psnr_list[5])
-                # ref_mssim_list[6] = ref_mssim_list[5]+(0.0348-0.0250)/(0.0483-0.0250)*(ref_mssim_list[6]-ref_mssim_list[5])   
 
                 psnr_res = {}
                 mssim_res = {}

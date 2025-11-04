@@ -96,11 +96,19 @@ class SubpelConvWithAdapterSwitch(torch.nn.Module):
             act_layer=activation)
         
         # Switchable channels
-        self.switch = Parameter(torch.ones(6,self.subpel_conv[0].out_channels))
-        self.index = 0 
+        self.switch = Parameter(torch.ones(5,self.subpel_conv[0].out_channels))
+
+        # Non learnable switch for anchor model biterate
+        #self.anchor_switch = torch.ones(1,self.subpel_conv[0].out_channels)
+        self.register_buffer("switch_anchor", torch.ones(1,self.subpel_conv[0].out_channels))
+        self.index = 0
 
     def forward(self, x):
-        switch = thresholdFunction.apply(self.switch[self.index,:])
+        if self.index < 5:
+            switch = thresholdFunction.apply(self.switch[self.index,:])
+        else:
+            switch = thresholdFunction.apply(self.switch_anchor)
+
         out = nn.functional.conv2d(x,
                                   self.subpel_conv[0].weight* switch.view(-1,1,1,1),
                                   self.subpel_conv[0].bias,
@@ -168,11 +176,19 @@ class ConvWithAdapterSwitch(torch.nn.Module):
             act_layer=activation)
         
         # Switchable channels
-        self.switch = Parameter(torch.ones(6,conv.out_channels))
+        self.switch = Parameter(torch.ones(5,conv.out_channels))
+
+        # Non learnable switch for anchor model biterate
+        #self.switch_anchor = torch.ones(1,conv.out_channels)
+        self.register_buffer("switch_anchor", torch.ones(1, conv.out_channels))
         self.index = 0     
         
     def forward(self, x):
-        switch = thresholdFunction.apply(self.switch[self.index,:])
+        if self.index < 5:
+            switch = thresholdFunction.apply(self.switch[self.index,:])
+        else:
+            switch = thresholdFunction.apply(self.switch_anchor)
+        
         out=nn.functional.conv2d(x,
                                   self.conv.weight* switch.view(-1,1,1,1),
                                   self.conv.bias,

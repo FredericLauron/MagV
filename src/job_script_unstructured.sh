@@ -39,7 +39,7 @@ srun python train_unstructured.py   --batch-size=16 \
                                     --num-workers=30 \
                                     --mask \
                                     --maxPrunning=0.4 \
-                                    --nameRun=magv_04_unstructured_exp_perc \
+                                    --nameRun=magv_04_unstructured_exp_perc_min1 \
                                     --maxPoint=6
                                     
 # Print job completion time

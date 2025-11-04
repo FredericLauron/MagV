@@ -27,5 +27,5 @@ models = {
     'cnn': WACNN,
     'cheng': lambda:cheng2020_attn(quality=6,pretrained=True),
     'chengBA2': Cheng2020Attention_BA2,
-    'mean_scale_hyperprior': lambda:mbt2018_mean(quality=6,pretrained=True), # TODO same as cheng2020
+    'msh': lambda:mbt2018_mean(quality=6,pretrained=True), # TODO same as cheng2020
 }

@@ -136,40 +136,82 @@ def generate_mask_from_unstructured(model,amounts:list):
 ############################################################STRUCTURED PRUNING##############################################################
 ############################################################################################################################################
 
+# def compute_neuron_norm(parameters_to_prune):
+#     norms = {}
+#     local_medians = {}
+#     nb_neuron = 0
+#     for module, _ in parameters_to_prune:
+#         W = module.weight.data
+
+#         if isinstance(module, torch.nn.Conv2d):
+#             # Norm per filter (output channel)
+#             neuron_norms = torch.norm(W.view(W.size(0), -1), p=2, dim=1)
+#             # Nb neuron per filter
+#             nb_neuron += W.shape[0]
+  
+
+#         elif isinstance(module, torch.nn.Linear):
+#             # Norm per neuron (row of weight matrix)
+#             neuron_norms = torch.norm(W, p=2, dim=1)
+#             # Nb neuron 
+#             nb_neuron += W.shape[0]
+
+#         #local median
+#         local_medians[module] = neuron_norms.median()
+
+#         #norms
+#         norms[module] = neuron_norms
+    
+#     #global median
+#     all_neurons = torch.cat(list(norms.values()))
+#     global_median = all_neurons.median()
+
+#     # Normalization of the norms
+#     norms = {k: (v/local_medians[k])*global_median for k, v in norms.items()}
+#     #norms = {k: v/nb_neuron for k, v in norms.items()}
+    
+#     return norms
 def compute_neuron_norm(parameters_to_prune):
     norms = {}
-    #local_medians = {}
     nb_neuron = 0
+    all_scores = []
     for module, _ in parameters_to_prune:
         W = module.weight.data
 
-        if isinstance(module, torch.nn.Conv2d):
+        if isinstance(module, torch.nn.Conv2d):# or isinstance(module,torch.nn.ConvTranspose2d):
             # Norm per filter (output channel)
-            neuron_norms = torch.norm(W.view(W.size(0), -1), p=2, dim=1)
+
+            # score of each filter/neuron in the weight matrix of the layer
+            neuron_norms = (W.view(W.size(0), -1) ** 2).mean(dim=1)
+            #L-2 normalization of the scores
+            #neuron_norms = neuron_scores / (torch.norm(neuron_scores, p=2) + 1e-8)
+
+            #neuron_norms = torch.norm(W.view(W.size(0), -1), p=2, dim=1)
             # Nb neuron per filter
             nb_neuron += W.shape[0]
+
   
 
         elif isinstance(module, torch.nn.Linear):
             # Norm per neuron (row of weight matrix)
-            neuron_norms = torch.norm(W, p=2, dim=1)
+            neuron_norms = (W ** 2).mean(dim=1)
             # Nb neuron 
             nb_neuron += W.shape[0]
 
-        #local median
-        #local_medians[module] = neuron_norms.median()
-
-        #norms
+        layer_l2 = torch.norm(neuron_norms, p=2)
+        neuron_norms = neuron_norms / (layer_l2 + 1e-8)
         norms[module] = neuron_norms
-    
-    #global median
-    all_neurons = torch.cat(list(norms.values()))
-    global_median = all_neurons.median()
+        
+    #all_scores.append(neuron_norms)
+    # all_scores = torch.cat(all_scores)
+    # global_norm = torch.norm(all_scores, p=2)
 
     # Normalization of the norms
-    #norms = {k: (v/local_medians[k])*global_median for k, v in norms.items()}
-    norms = {k: v/nb_neuron for k, v in norms.items()}
-    
+
+   
+    #norms = {k: v/global_norm for k, v in norms.items()}
+    # for module, neuron_norms in norms.items():
+    #     print(f"Module: {module}, Neuron Norms: {neuron_norms}")
     return norms
 
 
@@ -184,11 +226,16 @@ def get_global_list(norms_dict):
 
 
 def get_neuron_to_prune(global_list, amount):
-    global_list.sort(key=lambda x: x[2], reverse=True)
-    total_neurons = len(global_list)
-    num_to_prune = int(amount * total_neurons)
+    # global_list.sort(key=lambda x: x[2], reverse=True)
+    # total_neurons = len(global_list)
+    # num_to_prune = int(amount * total_neurons)
 
-    neurons_to_prune = global_list[-num_to_prune:]
+    # neurons_to_prune = global_list[-num_to_prune:]
+
+    global_list.sort(key=lambda x: x[2])
+    num_to_prune = int(len(global_list) * amount)
+    neurons_to_prune = global_list[:num_to_prune]
+
     return neurons_to_prune
 
 def group_by_module(neurons_to_prune):
@@ -248,15 +295,16 @@ def generate_mask_from_structured(model,amounts:list):
 
     for index in amounts:
 
-        # generate the pruning masks
-        #prune.global_unstructured(parameters_to_prune, pruning_method=prune.L1Unstructured,amount=index)
-        global_structured(parameters_to_prune, index)
-        
-        # Save pruning masks
-        out_all_mask.append(save_mask(model))
+        if index != 0.0:
+            # generate the pruning masks
+            #prune.global_unstructured(parameters_to_prune, pruning_method=prune.L1Unstructured,amount=index)
+            global_structured(parameters_to_prune, index)
+            
+            # Save pruning masks
+            out_all_mask.append(save_mask(model))
 
-        #cleaning the pruning masks from the model
-        delete_mask(model, parameters_to_prune)
+            #cleaning the pruning masks from the model
+            delete_mask(model, parameters_to_prune)
 
     return out_all_mask ,parameters_to_prune
 

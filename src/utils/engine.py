@@ -67,8 +67,16 @@ def train_one_epoch(
             lambda_value = lambda_list[index]
             #print("index:", index, "lambda_value:", lambda_value)
 
-            apply_saved_mask(model.g_a, all_mask["g_a"][index])
-            apply_saved_mask(model.g_s, all_mask["g_s"][index])
+            if index != len(lambda_list)-1:
+
+                apply_saved_mask(model.g_a, all_mask["g_a"][index])
+
+                if "g_s" in all_mask:
+                    apply_saved_mask(model.g_s, all_mask["g_s"][index])
+
+            # else:
+                # No mask for 0.483 lambda 0.0 amount pruning   
+                # pass
 
             criterion.lmbda = lambda_value
 
@@ -131,9 +139,11 @@ def train_one_epoch(
         mse_loss_metric.update(out_criterion["mse_loss"].clone().detach())
         aux_loss_metric.update(aux_loss.clone().detach())
 
-        if args_mask and isinstance(model, Cheng2020Attention):
+        if args_mask and isinstance(model, Cheng2020Attention) and index != len(lambda_list)-1:
             delete_mask(model.g_a, parameters_to_prune["g_a"])
-            delete_mask(model.g_s, parameters_to_prune["g_s"])
+
+            if "g_s" in all_mask:
+                delete_mask(model.g_s, parameters_to_prune["g_s"])
 
     return loss_tot_metric.avg, bpp_loss_metric.avg, mse_loss_metric.avg, aux_loss_metric.avg
 

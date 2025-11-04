@@ -2,12 +2,13 @@
 #SBATCH --job-name=magv             # Name of your job
 #SBATCH --output=%x_%j.out            # Output file (%x for job name, %j for job ID)
 #SBATCH --error=%x_%j.err             # Error file
-#SBATCH --partition=L40S              # Partition to submit to (A100, V100, etc.)
+#SBATCH --partition=mm              # Partition to submit to (A100, V100, etc.)
+#SBATCH --nodelist=nodemm06
 
 #SBATCH --gres=gpu:1                  # Request 1 GPU
-#SBATCH --cpus-per-task=30             # Request 8 CPU cores
+#SBATCH --cpus-per-task=24             # Request 8 CPU cores
 #SBATCH --mem=32G                     # Request 32 GB of memory
-#SBATCH --time=24:00:00               # Time limit for the job (hh:mm:ss)
+
 
 # Print job details
 echo "Starting job on node: $(hostname)"
@@ -28,7 +29,7 @@ conda activate magv
 srun python train_structured.py   --batch-size=16 \
                                     --cuda=1 \
                                     --dataset=/home/ids/flauron-23/fiftyone/open-images-v6 \
-                                    --epochs=15 \
+                                    --epochs=51 \
                                     --lambda=0.013 \
                                     --learning-rate=0.0001 \
                                     --model=cheng \
@@ -39,7 +40,7 @@ srun python train_structured.py   --batch-size=16 \
                                     --num-workers=30 \
                                     --mask \
                                     --maxPrunning=0.2 \
-                                    --maxPoint=12 \
-                                    --nameRun=magv_02_structured_exp_perc_8_point
+                                    --maxPoint=6 \
+                                    --nameRun=magv_02_50_epochs
 # Print job completion time
 echo "Job finished at: $(date)"

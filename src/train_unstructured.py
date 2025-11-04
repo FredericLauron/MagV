@@ -220,7 +220,7 @@ def main():
     # amounts = np.linspace(0, args.maxPrunning, 6)[::-1]
     # lambda_list = [0.0018,0.0035,0.0067,0.0130,0.0250,0.483]
 
-    alpha = np.linspace(0, args.maxPrunning, args.maxPoint)[::-1]
+    alpha = np.linspace(0.01, args.maxPrunning, args.maxPoint)[::-1]
     lambda_list , amounts = lambda_percentage(alpha, amount = args.maxPrunning)
 
     #adjustable distribution

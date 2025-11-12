@@ -33,7 +33,7 @@ from custom_comp.zoo import models
 
 from opt import parse_args
 
-from utils import train_one_epoch, test_epoch,compress_one_epoch, RateDistortionLoss, CustomDataParallel, configure_optimizers, save_checkpoint, seed_all, TestKodakDataset, get_Cheng2020Attention_with_conv_switch, set_cheng2020Attention_index,frozen_cheng2020Attention
+from utils import train_one_epoch, test_epoch,compress_one_epoch, RateDistortionLoss, CustomDataParallel, configure_optimizers, save_checkpoint, seed_all, TestKodakDataset, get_Cheng2020Attention_with_conv_switch, set_index_switch,freeze_model_with_switch
 from evaluate import plot_rate_distorsion
 import os
 import wandb
@@ -143,7 +143,7 @@ def main():
 
     #Done after optimizer to avoid trigger error
     #Froze all the parameters except the switches
-    frozen_cheng2020Attention(net)
+    freeze_model_with_switch(net)
 
     last_epoch = 0
 
@@ -215,7 +215,7 @@ def main():
 
             # Update the index
             #net.set_index(i)
-            set_cheng2020Attention_index(net,i)
+            set_index_switch(net,i)
 
             loss_tot_val, bpp_loss_val, mse_loss_val, aux_loss_val, psnr_val, ssim_val = test_epoch(epoch, val_dataloader, net, criterion, tag = 'Val')
 
@@ -269,7 +269,7 @@ def main():
 
             # Update index    
             # net.set_index(i)
-            set_cheng2020Attention_index(net,i)
+            set_index_switch(net,i)
 
             loss_tot_kodak, bpp_loss_kodak, mse_loss_kodak, aux_loss_kodak, psnr_kodak, ssim_kodak = test_epoch(epoch, kodak_dataloader, net, criterion, tag = 'Kodak')
 
@@ -328,7 +328,7 @@ def main():
 
                 # Update index 
                 # net.set_index(index)
-                set_cheng2020Attention_index(net,index)
+                set_index_switch(net,index)
 
                 bpp_ac, psnr_ac, mssim_ac = compress_one_epoch(net, kodak_dataloader, device)
 

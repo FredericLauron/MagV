@@ -4,7 +4,7 @@ from torch.nn import Parameter
 import sys
 
 from compressai.layers import ResidualBlock, AttentionBlock, ResidualBlockWithStride, ResidualBlockUpsample
-from compressai.models import Cheng2020Attention
+from compressai.models import Cheng2020Attention, MeanScaleHyperprior
 
 from functools import partial
 
@@ -255,7 +255,21 @@ def get_Cheng2020Attention_with_conv_switch(model:Cheng2020Attention,rank=4,alph
                     if not isinstance(units, nn.Conv2d): # To avoid last 1x1 conv
                         units.conv[2] = assign_conv_adapter(units.conv[2])
 
-def set_cheng2020Attention_index(model:Cheng2020Attention,index:int):
+# TODO write LoRA for nn.convTranspose2d
+# def get_mbt2018_mean_with_conv_switch(model:MeanScaleHyperprior,rank=4,alpha=1.0,act=None,divide_rank = False):
+    
+#     assign_conv_adapter = partial(ConvWithAdapterSwitch, rank=rank, alpha=alpha, activation = act, divide_rank = divide_rank)
+#     assign_subpel_conv_adapter = partial(SubpelConvWithAdapterSwitch, rank=rank, alpha=alpha, activation = act, divide_rank = divide_rank)
+
+#     for _,layer in enumerate(model.g_a): # encoder
+#         if isinstance(layer, nn.Conv2d):
+#                 layer = assign_conv_adapter(layer)
+
+#     for _,layer in enumerate(model.g_s): # decoder
+#         if isinstance(layer, nn.ConvTranspose2d):
+
+
+def set_index_switch(model,index:int):
 
     for _,module  in model.g_a.named_modules(): # encoder
         if isinstance(module,ConvWithAdapterSwitch):
@@ -265,7 +279,7 @@ def set_cheng2020Attention_index(model:Cheng2020Attention,index:int):
         if isinstance(module,ConvWithAdapterSwitch) or isinstance(module,SubpelConvWithAdapterSwitch):
                 module.set_index(index)
 
-def frozen_cheng2020Attention(model:Cheng2020Attention):
+def freeze_model_with_switch(model):
     
     # Freeze all parameters 
     for _,param in model.named_parameters():

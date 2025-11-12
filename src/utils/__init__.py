@@ -13,8 +13,8 @@ from .masks import delete_mask, save_mask, generate_mask_from_unstructured,\
     generate_mask_from_structured_fisher,lambda_percentage
 
 #from .chengBA2_old import get_Cheng2020Attention_with_conv_switch, set_cheng2020Attention_index,frozen_cheng2020Attention
-from .chengBA2 import frozen_cheng2020Attention, get_Cheng2020Attention_with_conv_switch,\
-      set_cheng2020Attention_index,ConvWithAdapterSwitch,SubpelConvWithAdapterSwitch
+from .chengBA2 import freeze_model_with_switch, get_Cheng2020Attention_with_conv_switch,\
+      set_index_switch,ConvWithAdapterSwitch,SubpelConvWithAdapterSwitch
 import random
 import os
 import numpy as np
@@ -110,7 +110,6 @@ def save_checkpoint(state, is_best, out_dir, filename='last_checkpoint.pth.tar')
     if is_best:
         name_best = filename.replace('.pth.tar','') + '_best.pth.tar'
         shutil.copyfile(f'{out_dir}/{filename}', f'{out_dir}/{name_best}')
-
 
 
 class CustomDataParallel(nn.DataParallel):

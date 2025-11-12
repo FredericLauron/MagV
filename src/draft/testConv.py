@@ -9,7 +9,7 @@ def check_neuron_sparsity(parameters_to_prune):
     zeroed_neurons = 0
     for module, _ in parameters_to_prune:
         W = module.weight.data
-        if isinstance(module, nn.Conv2d):
+        if isinstance(module, nn.Conv2d) or isinstance(module,nn.ConvTranspose2d):
             for i in range(W.size(0)):  # output channels
                 total_neurons += 1
                 if torch.all(W[i] == 0):
@@ -26,7 +26,7 @@ class TinyConvNet(nn.Module):
     def __init__(self):
         super(TinyConvNet,self).__init__()
         self.conv1 = nn.Conv2d(2, 4, 3, padding=1)
-        self.conv2 = nn.Conv2d(4, 2, 3, padding=1)
+        self.conv2 = nn.ConvTranspose2d(4, 8, 3, padding=1)
 
     def forward(self,x):
         x = self.conv1(x)
@@ -40,7 +40,7 @@ def compute_neuron_norm(parameters_to_prune):
     for module, _ in parameters_to_prune:
         W = module.weight.data
 
-        if isinstance(module, torch.nn.Conv2d):# or isinstance(module,torch.nn.ConvTranspose2d):
+        if isinstance(module, torch.nn.Conv2d) or isinstance(module,torch.nn.ConvTranspose2d):
             # Norm per filter (output channel)
 
             # score of each filter/neuron in the weight matrix of the layer
@@ -250,7 +250,7 @@ if __name__ == "__main__":
     m.conv2.weight.data[1] = 10*torch.randn(m.conv2.weight[0].shape)#0.0
 
     amount=0.5
-    parameters_to_prune = [(module,"weight") for module in filter(lambda m: type(m) in [nn.Conv2d, nn.Linear], m.modules())]
+    parameters_to_prune = [(module,"weight") for module in filter(lambda m: type(m) in [nn.Conv2d, nn.Linear,nn.ConvTranspose2d], m.modules())]
 
     # print(m.conv1.weight)
     # print(m.conv2.weight)

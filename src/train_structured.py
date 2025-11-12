@@ -39,8 +39,6 @@ from evaluate import plot_rate_distorsion
 import os
 import wandb
 
-from lora import get_lora_model, get_vanilla_finetuned_model
-
 import numpy as np
 import json
 
@@ -55,6 +53,15 @@ def main():
     args = parse_args()
     print(args)
 
+    if not args.mask:
+        print("Mask is 0 or False — exiting program.")
+        return
+    
+    if args.seed is not None:
+        seed_all(args.seed)
+        args.save_dir = f'{args.save_dir}_seed_{args.seed}'
+
+
     #Folder where data are saved for this run
     img_dir = os.path.join(os.path.dirname(__file__), "..", "imgs", args.nameRun)
     data_dir = os.path.join(os.path.dirname(__file__), "..", "data", args.nameRun)
@@ -68,23 +75,7 @@ def main():
     os.makedirs(model_dir, exist_ok=True)
  
 
-
-    if not args.mask:
-        print("Mask is 0 or False — exiting program.")
-        return
     
-    if args.seed is not None:
-        seed_all(args.seed)
-        args.save_dir = f'{args.save_dir}_seed_{args.seed}'
-    
-    # if args.lora:
-    #     if args.vanilla_adapt:
-    #         conf_name = 'vanilla_adapt'
-    #     else:
-    #         conf_name = str(args.lora_config).split('/')[-1].replace('.yml','').replace('.yaml','')
-    #     init_lr = str(args.learning_rate).replace('0.','0_')
-    #     args.save_dir = f'{args.save_dir}_conf_{conf_name}_opt_{args.lora_opt}_sched_{args.lora_sched}_lr_{init_lr}'
-
     if log_wandb:
         wandb.init(
             project='training',
@@ -97,9 +88,12 @@ def main():
         print(f'Results will be saved in: {args.save_dir}')
         os.makedirs(args.save_dir, exist_ok=True)
 
+    # device
     device = "cuda" if args.cuda and torch.cuda.is_available() else "cpu"
     print(f'n gpus: {torch.cuda.device_count()}')
 
+    # datasets and dataloaders
+    # transforms
     train_transforms = transforms.Compose(
         [transforms.RandomCrop(args.patch_size), transforms.ToTensor()]
     )
@@ -108,15 +102,12 @@ def main():
         [transforms.CenterCrop(args.patch_size), transforms.ToTensor()]
     )
 
+    # datasets
     train_dataset = ImageFolder(args.dataset, split="train", transform=train_transforms)
     test_dataset = ImageFolder(args.dataset, split="test", transform=test_transforms)
+    kodak_dataset = TestKodakDataset(data_dir = args.test_dir) # Kodak test set
 
-
-    # Kodak test set
-    kodak_dataset = TestKodakDataset(data_dir = args.test_dir)
-
-    
-
+    # dataloaders
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=args.batch_size,
@@ -142,14 +133,18 @@ def main():
     )
     print(f'Training Dataloader: {len(train_dataloader)}')
 
+
+    # model
     net = models[args.model]()
     net = net.to(device)
 
-    
-
-
+    # optimizers
     optimizer, aux_optimizer = configure_optimizers(net, args)
+
+    # learning rate scheduler
     lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, "min", factor=0.3, patience=4)
+
+    # loss function
     criterion = RateDistortionLoss(lmbda=args.lmbda)
 
     last_epoch = 0
@@ -216,15 +211,13 @@ def main():
     #mask and pruning
     all_mask={}
     parameters_to_prune={}
-    #amounts = [0.6,0.5,0.4,0.3,0.2,0.0] #[0.7, ...,0.0]
     
     # lambda values on the ray distortion curve
-    # can be more tha 6 values 
+    # can be more than 6 values 
     #lambda_list = [0.0018,0.0025,0.0035,0.0067,0.0130,0.0250,0.0348,0.483]
     alpha = np.linspace(0.0, args.maxPrunning, args.maxPoint)[::-1]
     lambda_list , amounts = lambda_percentage(alpha, amount = args.maxPrunning)
     
-
     if args.mask and args.model=="cheng":
 
         #all_mask, parameters_to_prune = generate_mask(net.g_a, amounts)
@@ -235,11 +228,7 @@ def main():
             all_mask["g_a"], parameters_to_prune["g_a"] = generate_mask_from_structured(net.g_a, amounts)
             all_mask["g_s"], parameters_to_prune["g_s"] = generate_mask_from_structured(net.g_s, amounts)
         
-        
-        #save the mask    
-        #with open('/home/ids/flauron-23/MagV/results/mask/mask/mask.json', 'w') as f:
-            #json.dump(all_mask, f)
- 
+        #save masks 
         torch.save(all_mask, f"{mask_dir}/mask_{args.nameRun}.pth")
         torch.save(parameters_to_prune, f"{mask_dir}/parameters_to_prune_{args.nameRun}.pth")
         
@@ -331,16 +320,6 @@ def main():
 
     for epoch in range(last_epoch, args.epochs):
         print(f"Learning rate: {optimizer.param_groups[0]['lr']}")
-
-        # if args.mask and args.model=="cheng":
-        #     index = torch.randint(0,6,(1,))
-        #     print("index:", index)
-        #     mask = all_mask[index]
-        #     lambda_value = lambda_list[index]
-
-        #     apply_saved_mask(net.g_a, mask)
-        #     criterion.lmbda = lambda_value
-
 
         # Training 
         loss_tot_train, bpp_train, mse_train, aux_train_loss = train_one_epoch(

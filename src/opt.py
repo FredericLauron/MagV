@@ -119,6 +119,7 @@ def parse_args():
     parser.add_argument("--rank", type=int,help="LoRA rank")
     parser.add_argument("--maxPoint", type=int, default=6, help="Maximum point on the RD curve")
     parser.add_argument("--maxPrunning", type=float, default=0.6, help="Maximum prunning amount")
+    parser.add_argument("--pruningType", type=str, default="unstructured", help="type of pruning [unstructured, structured, adapter]")
 
 
 

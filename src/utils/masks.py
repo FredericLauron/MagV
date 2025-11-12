@@ -111,20 +111,21 @@ def generate_mask_from_unstructured(model,amounts:list):
     assert amounts is not None and len(amounts) > 0
 
     #register all the parameters for the model that are available for pruning
-    parameters_to_prune = [(module, "weight") for module in filter(lambda m: type(m) in [torch.nn.Conv2d, torch.nn.Linear], model.modules())]
+    parameters_to_prune = [(module, "weight") for module in filter(lambda m: type(m) in [torch.nn.Conv2d, torch.nn.Linear,torch.nn.ConvTranspose2d], model.modules())]
 
     out_all_mask = []
 
     for index in amounts:
 
-        # generate the pruning masks
-        prune.global_unstructured(parameters_to_prune, pruning_method=prune.L1Unstructured,amount=index)
-        
-        # Save pruning masks
-        out_all_mask.append(save_mask(model))
+        if not np.isclose(index ,0.0):
+            # generate the pruning masks
+            prune.global_unstructured(parameters_to_prune, pruning_method=prune.L1Unstructured,amount=index)
+            
+            # Save pruning masks
+            out_all_mask.append(save_mask(model))
 
-        #cleaning the pruning masks from the model
-        delete_mask(model, parameters_to_prune)
+            #cleaning the pruning masks from the model
+            delete_mask(model, parameters_to_prune)
 
     return out_all_mask ,parameters_to_prune
 
@@ -136,41 +137,6 @@ def generate_mask_from_unstructured(model,amounts:list):
 ############################################################STRUCTURED PRUNING##############################################################
 ############################################################################################################################################
 
-# def compute_neuron_norm(parameters_to_prune):
-#     norms = {}
-#     local_medians = {}
-#     nb_neuron = 0
-#     for module, _ in parameters_to_prune:
-#         W = module.weight.data
-
-#         if isinstance(module, torch.nn.Conv2d):
-#             # Norm per filter (output channel)
-#             neuron_norms = torch.norm(W.view(W.size(0), -1), p=2, dim=1)
-#             # Nb neuron per filter
-#             nb_neuron += W.shape[0]
-  
-
-#         elif isinstance(module, torch.nn.Linear):
-#             # Norm per neuron (row of weight matrix)
-#             neuron_norms = torch.norm(W, p=2, dim=1)
-#             # Nb neuron 
-#             nb_neuron += W.shape[0]
-
-#         #local median
-#         local_medians[module] = neuron_norms.median()
-
-#         #norms
-#         norms[module] = neuron_norms
-    
-#     #global median
-#     all_neurons = torch.cat(list(norms.values()))
-#     global_median = all_neurons.median()
-
-#     # Normalization of the norms
-#     norms = {k: (v/local_medians[k])*global_median for k, v in norms.items()}
-#     #norms = {k: v/nb_neuron for k, v in norms.items()}
-    
-#     return norms
 def compute_neuron_norm(parameters_to_prune):
     norms = {}
     nb_neuron = 0
@@ -178,7 +144,7 @@ def compute_neuron_norm(parameters_to_prune):
     for module, _ in parameters_to_prune:
         W = module.weight.data
 
-        if isinstance(module, torch.nn.Conv2d):# or isinstance(module,torch.nn.ConvTranspose2d):
+        if isinstance(module, torch.nn.Conv2d) or isinstance(module,torch.nn.ConvTranspose2d):
             # Norm per filter (output channel)
 
             # score of each filter/neuron in the weight matrix of the layer
@@ -202,16 +168,6 @@ def compute_neuron_norm(parameters_to_prune):
         neuron_norms = neuron_norms / (layer_l2 + 1e-8)
         norms[module] = neuron_norms
         
-    #all_scores.append(neuron_norms)
-    # all_scores = torch.cat(all_scores)
-    # global_norm = torch.norm(all_scores, p=2)
-
-    # Normalization of the norms
-
-   
-    #norms = {k: v/global_norm for k, v in norms.items()}
-    # for module, neuron_norms in norms.items():
-    #     print(f"Module: {module}, Neuron Norms: {neuron_norms}")
     return norms
 
 
@@ -289,13 +245,13 @@ def generate_mask_from_structured(model,amounts:list):
     assert amounts is not None and len(amounts) > 0
 
     #register all the parameters for the model that are available for pruning
-    parameters_to_prune = [(module, "weight") for module in filter(lambda m: type(m) in [torch.nn.Conv2d, torch.nn.Linear], model.modules())]
+    parameters_to_prune = [(module, "weight") for module in filter(lambda m: type(m) in [torch.nn.Conv2d, torch.nn.Linear, torch.nn.ConvTranspose2d], model.modules())]
 
     out_all_mask = []
 
     for index in amounts:
 
-        if index != 0.0:
+        if not np.isclose(index ,0.0):
             # generate the pruning masks
             #prune.global_unstructured(parameters_to_prune, pruning_method=prune.L1Unstructured,amount=index)
             global_structured(parameters_to_prune, index)
@@ -467,3 +423,31 @@ def lambda_percentage(alpha,amount):
     lambda_values = np.exp(np.log(lambda_max) * (1 - alpha / amount) + np.log(lambda_min) * (alpha / amount))
 
     return lambda_values,amount * (lambda_max - lambda_values) / (lambda_max - lambda_min)
+
+def check_neuron_sparsity(parameters_to_prune):
+    """
+    Check neuron sparsity in all pruned layers of the model (g_a or g_s)
+    print it and return it
+    """
+    total_neurons = 0
+    zeroed_neurons = 0
+    for module, _ in parameters_to_prune:
+        W = module.weight.data
+        if isinstance(module, torch.nn.Conv2d) or isinstance(module,torch.nn.ConvTranspose2d):
+            for i in range(W.size(0)):  # output channels
+                total_neurons += 1
+                if torch.allclose(W[i], torch.zeros_like(W[i])):
+                #if torch.all(W[i] == 0):
+                    zeroed_neurons += 1
+        elif isinstance(module, torch.nn.Linear):
+            for i in range(W.size(0)):  # rows
+                total_neurons += 1
+                #if torch.all(W[i] == 0):
+                if torch.allclose(W[i], torch.zeros_like(W[i])):
+                    zeroed_neurons += 1
+    
+    print(f"Neuron sparsity: {zeroed_neurons/total_neurons:.2%}")
+    return torch.tensor([zeroed_neurons/total_neurons],dtype=torch.float64)
+
+def print_layer(model,layer_type):
+    [print(m.weight) for _, m in model.named_modules() if isinstance(m, layer_type)]

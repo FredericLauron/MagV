@@ -26,13 +26,13 @@ conda activate magv
 
 # Execute the Python script with specific arguments
 #srun python my_script.py --data $DATA_DIR --lr $LR --epochs $EPOCHS --batch-size $BATCH_SIZE
-srun python train_structured_refactor.py   --batch-size=16 \
+srun python train_refactor.py   --batch-size=16 \
                                     --cuda=1 \
                                     --dataset=/home/ids/flauron-23/fiftyone/open-images-v6 \
-                                    --epochs=51 \
+                                    --epochs=21 \
                                     --lambda=0.013 \
                                     --learning-rate=0.0001 \
-                                    --model=cheng \
+                                    --model=msh \
                                     --save=1 \
                                     --save-dir=../results/mask/adapt_0483 \
                                     --test-dir=/home/ids/flauron-23/kodak \
@@ -41,7 +41,7 @@ srun python train_structured_refactor.py   --batch-size=16 \
                                     --mask \
                                     --maxPrunning=0.2 \
                                     --maxPoint=6 \
-                                    --nameRun=magv_02_50_refactor \
+                                    --nameRun=magv_02_structured_msh \
                                     --pruningType=structured
 # Print job completion time
 echo "Job finished at: $(date)"

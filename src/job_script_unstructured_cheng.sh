@@ -5,7 +5,7 @@
 #SBATCH --partition=L40S              # Partition to submit to (A100, V100, etc.)
 
 #SBATCH --gres=gpu:1                  # Request 1 GPU
-#SBATCH --cpus-per-task=24             # Request 8 CPU cores
+#SBATCH --cpus-per-task=30             # Request 8 CPU cores
 #SBATCH --mem=32G                     # Request 32 GB of memory
 #SBATCH --time=24:00:00               # Time limit for the job (hh:mm:ss)
 
@@ -25,13 +25,13 @@ conda activate magv
 
 # Execute the Python script with specific arguments
 #srun python my_script.py --data $DATA_DIR --lr $LR --epochs $EPOCHS --batch-size $BATCH_SIZE
-srun python train_refactor.py --batch-size=16 \
+srun python train_refactor.py   --batch-size=16 \
                                     --cuda=1 \
                                     --dataset=/home/ids/flauron-23/fiftyone/open-images-v6 \
-                                    --epochs=21 \
+                                    --epochs=15 \
                                     --lambda=0.013 \
                                     --learning-rate=0.0001 \
-                                    --model=msh \
+                                    --model=cheng \
                                     --save=1 \
                                     --save-dir=../results/mask/adapt_0483 \
                                     --test-dir=/home/ids/flauron-23/kodak \
@@ -39,8 +39,9 @@ srun python train_refactor.py --batch-size=16 \
                                     --num-workers=30 \
                                     --mask \
                                     --maxPrunning=0.4 \
+                                    --nameRun=magv_04_cheng_unstructured \
                                     --maxPoint=6 \
-                                    --nameRun=magv_04_unstructured_msh \
                                     --pruningType=unstructured
+                                    
 # Print job completion time
 echo "Job finished at: $(date)"

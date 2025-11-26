@@ -111,47 +111,63 @@ def count_neurons_weight(model):
 
 if __name__ == "__main__":
 
-    checkpoint_path = "/home/ids/flauron-23/MagV/data/magv_02_cheng_structured/models/magv_02_cheng_structured_checkpoint_best.pth.tar"
-    mask_path = "/home/ids/flauron-23/MagV/data/magv_02_cheng_structured/masks/mask_magv_02_cheng_structured.pth"
+    # checkpoint_path = "/home/ids/flauron-23/MagV/data/magv_02_cheng_structured/models/magv_02_cheng_structured_checkpoint_best.pth.tar"
+    # mask_path = "/home/ids/flauron-23/MagV/data/magv_02_cheng_structured/masks/mask_magv_02_cheng_structured.pth"
+    checkpoint_path = "/home/ids/flauron-23/MagV/data/magv_04_cheng_unstructured/models/magv_04_cheng_unstructured_checkpoint_best.pth.tar"
+    mask_path="/home/ids/flauron-23/MagV/data/magv_04_cheng_unstructured/masks/mask_magv_04_cheng_unstructured.pth"
     net = load_model_from_checkpoint(checkpoint_path=checkpoint_path,factory_function=cheng2020_attn)
     mask = load_mask(mask_path=mask_path)
 
     net.update(force=True)
     # apply_saved_mask(net.g_a, mask["g_a"][0])
     # apply_saved_mask(net.g_s, mask["g_s"][0])
-    apply_saved_mask(net.g_a, {k: v.to("cuda") for k, v in mask["g_a"][0].items()})
-    apply_saved_mask(net.g_s, {k: v.to("cuda") for k, v in mask["g_s"][0].items()})
 
-    remove_pruning(net.g_a)
-    remove_pruning(net.g_s)
+    for i in range(len(mask["g_a"])):
+        
+        net = load_model_from_checkpoint(checkpoint_path=checkpoint_path,factory_function=cheng2020_attn)
+        mask = load_mask(mask_path=mask_path)
 
-    # Replace GDN with Identity    
-    net.g_a =  replace_gdn_with_identity(net.g_a)
-    net.g_s =  replace_gdn_with_identity(net.g_s)
+        apply_saved_mask(net.g_a, {k: v.to("cuda") for k, v in mask["g_a"][i].items()})
+        apply_saved_mask(net.g_s, {k: v.to("cuda") for k, v in mask["g_s"][i].items()})
 
-    print("Number of neurons before simplification:")
-    total_neurons_before = count_neurons_weight(net)
-    print(total_neurons_before)
+        remove_pruning(net.g_a)
+        remove_pruning(net.g_s)
 
-    # #g_a
-    g_a_dummy_input = torch.zeros(1, 3, 512, 768).to("cuda")
-    simplified_g_a = simplify(net.g_a, g_a_dummy_input)
+        # Replace GDN with Identity    
+        net.g_a =  replace_gdn_with_identity(net.g_a)
+        net.g_s =  replace_gdn_with_identity(net.g_s)
 
-    print("Number of neurons after g_a simplification:")
-    total_neurons_after_g_a = count_neurons_weight(simplified_g_a)
-    print(total_neurons_after_g_a)
+        print(f"Number of neurons before simplification for mask{i}:")
+        total_neurons_before_g_a = count_neurons_weight(net.g_a)
+        print(total_neurons_before_g_a)
 
-    #g_s
-    # building dummy input for g_s
-    y = net.g_a(g_a_dummy_input)
-    y_hat = net.gaussian_conditional.quantize(y, "dequantize")
+        # #g_a
+        g_a_dummy_input = torch.zeros(1, 3, 512, 768).to("cuda")
+        simplified_g_a = simplify(net.g_a, g_a_dummy_input)
 
-    # Add a convolution layer at the beginning of g_s to make simplify have a convolution as first layer
-    # to rely on 
-    prepend_identity(net, y_hat.shape[1])
+        print(f"Number of neurons after g_a simplification for mask{i}:")
+        total_neurons_after_g_a = count_neurons_weight(simplified_g_a)
+        print(total_neurons_after_g_a)
 
-    # Apply simplify  
-    simplified_g_s = simplify(net.g_s, y_hat)
+        #g_s
+        # building dummy input for g_s
+        y = net.g_a(g_a_dummy_input)
+        y_hat = net.gaussian_conditional.quantize(y, "dequantize")
 
-    # print(net.g_a)
-    print("succeess")
+        # Add a convolution layer at the beginning of g_s to make simplify have a convolution as first layer
+        # to rely on 
+        prepend_identity(net, y_hat.shape[1])
+
+        print(f"Number of neurons before simplification for mask{i}:")
+        total_neurons_before_g_s = count_neurons_weight(net.g_s)
+        print(total_neurons_before_g_s)
+
+        # Apply simplify  
+        simplified_g_s = simplify(net.g_s, y_hat)
+
+        print(f"Number of neurons after simplification for mask{i}:")
+        total_neurons_after_g_s = count_neurons_weight(simplified_g_s)
+        print(total_neurons_after_g_s)
+
+        # print(net.g_a)
+        print("succeess")

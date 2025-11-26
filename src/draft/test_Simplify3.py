@@ -8,9 +8,10 @@ import simplify.utils as sutils
 
 from compressai.zoo import cheng2020_attn,mbt2018_mean
 from compressai.layers.gdn import GDN
-from utils import apply_saved_mask
+from compressai.models.waseda import Cheng2020Attention
+from utils import apply_saved_mask,inject_adapter,set_index_switch,thresholdFunction
 from collections import OrderedDict
-
+from custom_comp.zoo import  load_state_dict
 # import torch
 # from torchvision import models
 # from simplify import simplify
@@ -24,24 +25,34 @@ from collections import OrderedDict
 # simplified_model = simplify(model, dummy_input)
 
 
-def load_model_from_checkpoint(checkpoint_path,factory_function,quality=6,pretrained=True):
+def load_model_from_checkpoint(checkpoint_path,factory_function,quality=6,pretrained=True,adapter=False):
 
-    # Load the model
-    checkpoint = torch.load(checkpoint_path, map_location='cpu')
-    net = factory_function(quality=quality, pretrained=pretrained)
-    net = net.to("cuda")
+    # Load the checkpoint
+    state_dict = torch.load(checkpoint_path, map_location='cpu')
+    state_dict = load_state_dict(state_dict=state_dict)
+   
 
-    # # Load the state dict ignoring _quantized_cdf and _cdf_length
-    state_dict = checkpoint['state_dict']
-    if 'entropy_bottleneck._quantized_cdf' in state_dict:
-        state_dict['entropy_bottleneck._quantized_cdf'] = torch.zeros_like(net.entropy_bottleneck._quantized_cdf)
-    if 'entropy_bottleneck._cdf_length' in state_dict:
-        state_dict['entropy_bottleneck._cdf_length'] = torch.zeros_like(net.entropy_bottleneck._cdf_length)
+    ################################################################################
+    # fix temporary because of different naming conv -> layer
+    for k in list(state_dict["state_dict"].keys()):
+        if k.endswith("conv.weight"):
+            new_k=k.replace("conv.weight","layer.weight")
+            state_dict["state_dict"][new_k]=state_dict["state_dict"].pop(k)
+        if k.endswith("conv.bias"):
+            new_k=k.replace("conv.bias","layer.bias")
+            state_dict["state_dict"][new_k]=state_dict["state_dict"].pop(k)
+        if "subpel_conv" in k[18:]:#17
+            new_k=k[0:18]+k[18:].replace("subpel_conv","layer")
+            state_dict["state_dict"][new_k]=state_dict["state_dict"].pop(k)
+    ################################################################################
 
-    net.load_state_dict(state_dict,strict=False)
+    # Create the model
+    net = Cheng2020Attention().to("cuda")
+    inject_adapter(net,rank=8) if adapter else net
+    net.load_state_dict(state_dict["state_dict"])
 
-    #update entropy model
-    net.entropy_bottleneck.update(force=True)
+    # #update entropy model
+    net.update(force=True)
 
     return net
 
@@ -111,19 +122,24 @@ def count_neurons_weight(model):
 
 if __name__ == "__main__":
 
-    checkpoint_path = "/home/ids/flauron-23/MagV/data/magv_02_cheng_structured/models/magv_02_cheng_structured_checkpoint_best.pth.tar"
-    mask_path = "/home/ids/flauron-23/MagV/data/magv_02_cheng_structured/masks/mask_magv_02_cheng_structured.pth"
-    net = load_model_from_checkpoint(checkpoint_path=checkpoint_path,factory_function=cheng2020_attn)
-    mask = load_mask(mask_path=mask_path)
+    checkpoint_path = "/home/ids/flauron-23/MagV/data/magv_BA2_adapter_alpha1_16_epochs/models/magv_BA2_adapter_alpha1_16_epochs_checkpoint_best.pth.tar"
+    net = load_model_from_checkpoint(checkpoint_path=checkpoint_path,factory_function=cheng2020_attn,adapter=True)
 
-    net.update(force=True)
+    set_index_switch(net,0) # set to use the first adapter
+    for name,module in net.named_modules():
+        if "Adapter" in name:
+            switch = thresholdFunction.apply(module.swich[0,:])
+            module.layer.weight = module.layer.weight * switch.view(-1,1,1,1)
+            
+
+    # net.update(force=True)
     # apply_saved_mask(net.g_a, mask["g_a"][0])
     # apply_saved_mask(net.g_s, mask["g_s"][0])
-    apply_saved_mask(net.g_a, {k: v.to("cuda") for k, v in mask["g_a"][0].items()})
-    apply_saved_mask(net.g_s, {k: v.to("cuda") for k, v in mask["g_s"][0].items()})
+    # apply_saved_mask(net.g_a, {k: v.to("cuda") for k, v in mask["g_a"][0].items()})
+    # apply_saved_mask(net.g_s, {k: v.to("cuda") for k, v in mask["g_s"][0].items()})
 
-    remove_pruning(net.g_a)
-    remove_pruning(net.g_s)
+    # remove_pruning(net.g_a)
+    # remove_pruning(net.g_s)
 
     # Replace GDN with Identity    
     net.g_a =  replace_gdn_with_identity(net.g_a)
@@ -133,7 +149,8 @@ if __name__ == "__main__":
     total_neurons_before = count_neurons_weight(net)
     print(total_neurons_before)
 
-    # #g_a
+    
+    #g_a
     g_a_dummy_input = torch.zeros(1, 3, 512, 768).to("cuda")
     simplified_g_a = simplify(net.g_a, g_a_dummy_input)
 
@@ -141,17 +158,19 @@ if __name__ == "__main__":
     total_neurons_after_g_a = count_neurons_weight(simplified_g_a)
     print(total_neurons_after_g_a)
 
-    #g_s
-    # building dummy input for g_s
-    y = net.g_a(g_a_dummy_input)
-    y_hat = net.gaussian_conditional.quantize(y, "dequantize")
+    # #g_s
+    # # building dummy input for g_s
+    # y = net.g_a(g_a_dummy_input)
+    # y_hat = net.gaussian_conditional.quantize(y, "dequantize")
 
-    # Add a convolution layer at the beginning of g_s to make simplify have a convolution as first layer
-    # to rely on 
-    prepend_identity(net, y_hat.shape[1])
+    # # Add a convolution layer at the beginning of g_s to make simplify have a convolution as first layer
+    # # to rely on 
+    # prepend_identity(net, y_hat.shape[1])
 
-    # Apply simplify  
-    simplified_g_s = simplify(net.g_s, y_hat)
+    # # Apply simplify  
+    # simplified_g_s = simplify(net.g_s, y_hat)
 
-    # print(net.g_a)
+    # # print(net.g_a)
     print("succeess")
+
+    

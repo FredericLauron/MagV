@@ -13,8 +13,8 @@ from .masks import delete_mask, save_mask, generate_mask_from_unstructured,\
     generate_mask_from_structured_fisher,lambda_percentage
 
 #from .chengBA2_old import get_Cheng2020Attention_with_conv_switch, set_cheng2020Attention_index,frozen_cheng2020Attention
-from .chengBA2 import freeze_model_with_switch, get_Cheng2020Attention_with_conv_switch,\
-      set_index_switch,ConvWithAdapterSwitch,SubpelConvWithAdapterSwitch
+from .chengBA2 import freeze_model_with_switch, inject_adapter,\
+      set_index_switch,ConvWithAdapterSwitch,SubpelConvWithAdapterSwitch,measure_switch_sparcity,measure_sparsity_induce_by_switch,thresholdFunction
 import random
 import os
 import numpy as np

@@ -7,9 +7,11 @@ from simplify import simplify
 import simplify.utils as sutils
 
 from compressai.zoo import cheng2020_attn,mbt2018_mean
+from compressai.models.waseda import Cheng2020Attention
 from compressai.layers.gdn import GDN
 from utils import apply_saved_mask
 from collections import OrderedDict
+from custom_comp.zoo import  load_state_dict
 
 # import torch
 # from torchvision import models
@@ -22,28 +24,41 @@ from collections import OrderedDict
 
 # dummy_input = torch.zeros(1, 3, 224, 224)  # Tensor shape is that of a standard input for the given model
 # simplified_model = simplify(model, dummy_input)
+def load_model_from_checkpoint(checkpoint_path,factory_function,quality=6,pretrained=True,adapter=False):
 
+    # Load the checkpoint
+    state_dict = torch.load(checkpoint_path, map_location='cpu')
+    state_dict = load_state_dict(state_dict=state_dict)
 
-def load_model_from_checkpoint(checkpoint_path,factory_function,quality=6,pretrained=True):
+    # Create the model
+    net = Cheng2020Attention().to("cuda")
+    net.load_state_dict(state_dict["state_dict"])
 
-    # Load the model
-    checkpoint = torch.load(checkpoint_path, map_location='cpu')
-    net = factory_function(quality=quality, pretrained=pretrained)
-    net = net.to("cuda")
-
-    # # Load the state dict ignoring _quantized_cdf and _cdf_length
-    state_dict = checkpoint['state_dict']
-    if 'entropy_bottleneck._quantized_cdf' in state_dict:
-        state_dict['entropy_bottleneck._quantized_cdf'] = torch.zeros_like(net.entropy_bottleneck._quantized_cdf)
-    if 'entropy_bottleneck._cdf_length' in state_dict:
-        state_dict['entropy_bottleneck._cdf_length'] = torch.zeros_like(net.entropy_bottleneck._cdf_length)
-
-    net.load_state_dict(state_dict,strict=False)
-
-    #update entropy model
-    net.entropy_bottleneck.update(force=True)
+    # #update entropy model
+    net.update(force=True)
 
     return net
+
+# def load_model_from_checkpoint(checkpoint_path,factory_function,quality=6,pretrained=True):
+
+#     # Load the model
+#     checkpoint = torch.load(checkpoint_path, map_location='cpu')
+#     net = factory_function(quality=quality, pretrained=pretrained)
+#     net = net.to("cuda")
+
+#     # # Load the state dict ignoring _quantized_cdf and _cdf_length
+#     state_dict = checkpoint['state_dict']
+#     if 'entropy_bottleneck._quantized_cdf' in state_dict:
+#         state_dict['entropy_bottleneck._quantized_cdf'] = torch.zeros_like(net.entropy_bottleneck._quantized_cdf)
+#     if 'entropy_bottleneck._cdf_length' in state_dict:
+#         state_dict['entropy_bottleneck._cdf_length'] = torch.zeros_like(net.entropy_bottleneck._cdf_length)
+
+#     net.load_state_dict(state_dict,strict=False)
+
+#     #update entropy model
+#     net.entropy_bottleneck.update(force=True)
+
+#     return net
 
 def load_mask(mask_path):
     mask = torch.load(mask_path, map_location='cpu')
@@ -130,7 +145,7 @@ if __name__ == "__main__":
     net.g_s =  replace_gdn_with_identity(net.g_s)
 
     print("Number of neurons before simplification:")
-    total_neurons_before = count_neurons_weight(net)
+    total_neurons_before = count_neurons_weight(net.g_a)
     print(total_neurons_before)
 
     # #g_a

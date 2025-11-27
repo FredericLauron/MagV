@@ -1,4 +1,3 @@
-
 from opt import parse_args
 from utils import seed_all
 import os
@@ -11,9 +10,10 @@ def main():
     args = parse_args()
     project_run_path=os.path.dirname(__file__)
 
-    if not args.mask:
-        print("Mask is 0 or False — exiting program.")
-        return
+    # security to not waste run
+    # if not args.mask and args.pruningType!="adapter":
+    #     print("Mask is 0 or False, not adapter run — exiting program.")
+    #     return
     
     if args.seed is not None:
         seed_all(args.seed)
@@ -46,6 +46,10 @@ def main():
 
         if epoch%5==0:
             exp.make_plot(epoch)
+
+        # save model and mask for the last epoch in order to use the simplify lib
+        # if args.mask and epoch==args.epoch -1:
+
 
     if log_wandb:
         wandb.run.finish()

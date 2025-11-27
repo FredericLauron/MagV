@@ -132,13 +132,19 @@ class Experiment:
                     psnr_list.append(psnr_ac)
                     mssim_list.append(mssim_ac)
 
-                for index in range(6):
-                    refnet = self._get_ref_model(quality=index+1).to(self.ctx.device)
-                    ref_bpp_ac, ref_psnr_ac, ref_mssim_ac = compress_one_epoch(refnet, self.ctx.kodak_dataloader, self.ctx.device)
 
-                    ref_bpp_list.append(ref_bpp_ac)
-                    ref_psnr_list.append(ref_psnr_ac)
-                    ref_mssim_list.append(ref_mssim_ac)
+                
+                # ref_bpp_list.append(ref_results["bpp"][self.args.model])
+                # ref_psnr_list.append(ref_results["psnr"][self.args.model])
+                # ref_mssim_list.append(ref_results["mssim"][self.args.model])
+
+                # for index in range(6):
+                #     refnet = self._get_ref_model(quality=index+1).to(self.ctx.device)
+                #     ref_bpp_ac, ref_psnr_ac, ref_mssim_ac = compress_one_epoch(refnet, self.ctx.kodak_dataloader, self.ctx.device)
+
+                #     ref_bpp_list.append(ref_bpp_ac)
+                #     ref_psnr_list.append(ref_psnr_ac)
+                #     ref_mssim_list.append(ref_mssim_ac)
             
             elif self.args.pruningType=="adapter":
                 for index in range(6): #0 = max pruning, 5 = no pruning
@@ -154,12 +160,12 @@ class Experiment:
                     mssim_list.append(mssim_ac)
 
                     #Compute reference from cheng202_attn
-                    refnet = self._get_ref_model(quality=index+1).to(self.ctx.device)
-                    ref_bpp_ac, ref_psnr_ac, ref_mssim_ac = compress_one_epoch(refnet, self.ctx.kodak_dataloader, self.ctx.device)
+                    # refnet = self._get_ref_model(quality=index+1).to(self.ctx.device)
+                    # ref_bpp_ac, ref_psnr_ac, ref_mssim_ac = compress_one_epoch(refnet, self.ctx.kodak_dataloader, self.ctx.device)
 
-                    ref_bpp_list.append(ref_bpp_ac)
-                    ref_psnr_list.append(ref_psnr_ac)
-                    ref_mssim_list.append(ref_mssim_ac)
+                    # ref_bpp_list.append(ref_bpp_ac)
+                    # ref_psnr_list.append(ref_psnr_ac)
+                    # ref_mssim_list.append(ref_mssim_ac)
 
             psnr_res = {}
             mssim_res = {}
@@ -169,9 +175,17 @@ class Experiment:
             psnr_res["ours"] = psnr_list
             mssim_res["ours"] = mssim_list
             
-            bpp_res[self.args.model] = ref_bpp_list
-            psnr_res[self.args.model] = ref_psnr_list
-            mssim_res[self.args.model] = ref_mssim_list
+            # Reference results from json
+            with open("/home/ids/flauron-23/MagV/json/ref_results.json", "r") as f:
+                ref_results = json.load(f)
+
+            bpp_res["cheng"] = ref_results["bpp"]["cheng"]
+            psnr_res["cheng"] = ref_results["psnr"]["cheng"]
+            mssim_res["cheng"] = ref_results["mssim"]["cheng"]
+
+            bpp_res["stf"] = ref_results["bpp"]["stf"]
+            psnr_res["stf"] = ref_results["psnr"]["stf"]
+            mssim_res["stf"] = ref_results["mssim"]["stf"]
 
             plot_rate_distorsion(bpp_res, psnr_res, 
                                 epoch, eest="compression", 

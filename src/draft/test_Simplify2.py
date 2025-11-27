@@ -10,7 +10,8 @@ from compressai.zoo import cheng2020_attn,mbt2018_mean
 from compressai.layers.gdn import GDN
 from utils import apply_saved_mask
 from collections import OrderedDict
-
+from compressai.models.waseda import Cheng2020Attention
+from custom_comp.zoo import  load_state_dict
 # import torch
 # from torchvision import models
 # from simplify import simplify
@@ -23,27 +24,41 @@ from collections import OrderedDict
 # dummy_input = torch.zeros(1, 3, 224, 224)  # Tensor shape is that of a standard input for the given model
 # simplified_model = simplify(model, dummy_input)
 
+def load_model_from_checkpoint(checkpoint_path,factory_function,quality=6,pretrained=True,adapter=False):
 
-def load_model_from_checkpoint(checkpoint_path,factory_function,quality=6,pretrained=True):
+    # Load the checkpoint
+    state_dict = torch.load(checkpoint_path, map_location='cpu')
+    state_dict = load_state_dict(state_dict=state_dict)
 
-    # Load the model
-    checkpoint = torch.load(checkpoint_path, map_location='cpu')
-    net = factory_function(quality=quality, pretrained=pretrained)
-    net = net.to("cuda")
+    # Create the model
+    net = Cheng2020Attention().to("cuda")
+    net.load_state_dict(state_dict["state_dict"])
 
-    # # Load the state dict ignoring _quantized_cdf and _cdf_length
-    state_dict = checkpoint['state_dict']
-    if 'entropy_bottleneck._quantized_cdf' in state_dict:
-        state_dict['entropy_bottleneck._quantized_cdf'] = torch.zeros_like(net.entropy_bottleneck._quantized_cdf)
-    if 'entropy_bottleneck._cdf_length' in state_dict:
-        state_dict['entropy_bottleneck._cdf_length'] = torch.zeros_like(net.entropy_bottleneck._cdf_length)
-
-    net.load_state_dict(state_dict,strict=False)
-
-    #update entropy model
-    net.entropy_bottleneck.update(force=True)
+    # #update entropy model
+    net.update(force=True)
 
     return net
+
+# def load_model_from_checkpoint(checkpoint_path,factory_function,quality=6,pretrained=True):
+
+#     # Load the model
+#     checkpoint = torch.load(checkpoint_path, map_location='cpu')
+#     net = factory_function(quality=quality, pretrained=pretrained)
+#     net = net.to("cuda")
+
+#     # # Load the state dict ignoring _quantized_cdf and _cdf_length
+#     state_dict = checkpoint['state_dict']
+#     if 'entropy_bottleneck._quantized_cdf' in state_dict:
+#         state_dict['entropy_bottleneck._quantized_cdf'] = torch.zeros_like(net.entropy_bottleneck._quantized_cdf)
+#     if 'entropy_bottleneck._cdf_length' in state_dict:
+#         state_dict['entropy_bottleneck._cdf_length'] = torch.zeros_like(net.entropy_bottleneck._cdf_length)
+
+#     net.load_state_dict(state_dict,strict=False)
+
+#     #update entropy model
+#     net.entropy_bottleneck.update(force=True)
+
+#     return net
 
 def load_mask(mask_path):
     mask = torch.load(mask_path, map_location='cpu')
@@ -109,12 +124,18 @@ def count_neurons_weight(model):
             total_neurons += layer.out_features
     return total_neurons
 
+def strip_pruning_keys(state_dict):
+    keys_to_remove = [k for k in state_dict if any(x in k for x in ['.pruned_input', '.bf', '.zeros', '.idxs', 'identity_conv'])]
+    for k in keys_to_remove:
+        state_dict.pop(k)
+    return state_dict
+
 if __name__ == "__main__":
 
-    # checkpoint_path = "/home/ids/flauron-23/MagV/data/magv_02_cheng_structured/models/magv_02_cheng_structured_checkpoint_best.pth.tar"
-    # mask_path = "/home/ids/flauron-23/MagV/data/magv_02_cheng_structured/masks/mask_magv_02_cheng_structured.pth"
-    checkpoint_path = "/home/ids/flauron-23/MagV/data/magv_04_cheng_unstructured/models/magv_04_cheng_unstructured_checkpoint_best.pth.tar"
-    mask_path="/home/ids/flauron-23/MagV/data/magv_04_cheng_unstructured/masks/mask_magv_04_cheng_unstructured.pth"
+    checkpoint_path = "/home/ids/flauron-23/MagV/data/magv_02_cheng_structured/models/magv_02_cheng_structured_checkpoint_best.pth.tar"
+    mask_path = "/home/ids/flauron-23/MagV/data/magv_02_cheng_structured/masks/mask_magv_02_cheng_structured.pth"
+    #checkpoint_path = "/home/ids/flauron-23/MagV/data/magv_04_cheng_unstructured/models/magv_04_cheng_unstructured_checkpoint_best.pth.tar"
+    #mask_path="/home/ids/flauron-23/MagV/data/magv_04_cheng_unstructured/masks/mask_magv_04_cheng_unstructured.pth"
     net = load_model_from_checkpoint(checkpoint_path=checkpoint_path,factory_function=cheng2020_attn)
     mask = load_mask(mask_path=mask_path)
 
@@ -169,5 +190,15 @@ if __name__ == "__main__":
         total_neurons_after_g_s = count_neurons_weight(simplified_g_s)
         print(total_neurons_after_g_s)
 
-        # print(net.g_a)
-        print("succeess")
+
+        # save simplified models
+        net.g_a = simplified_g_a
+        net.g_s = simplified_g_s
+
+        state_dict = net.state_dict()
+        state_dict = strip_pruning_keys(state_dict)
+        save_path = f"/home/ids/flauron-23/MagV/data/magv_02_cheng_structured/simplified_models/sp_{i}.pth"
+        torch.save(state_dict, save_path)
+
+
+    print("succeess")

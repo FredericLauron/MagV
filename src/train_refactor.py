@@ -4,6 +4,7 @@ import os
 import wandb
 
 from experiment import Experiment
+from utils import save_checkpoint
 
 def main():
     log_wandb = True
@@ -47,8 +48,23 @@ def main():
         if epoch%5==0:
             exp.make_plot(epoch)
 
-        # save model and mask for the last epoch in order to use the simplify lib
-        # if args.mask and epoch==args.epoch -1:
+    # save model for the last epoch in order to use later
+    save_checkpoint(
+                        {
+                            "epoch": epoch,
+                            "state_dict": exp.ctx.net.state_dict(),
+                            "best_val_loss": exp.ctx.best_val_loss,
+                            "best_kodak_loss":exp.ctx.best_kodak_loss,
+                            "optimizer": exp.ctx.optimizer.state_dict(),
+                            "aux_optimizer": exp.ctx.aux_optimizer.state_dict() if exp.ctx.aux_optimizer is not None else None,
+                            "lr_scheduler": exp.ctx.lr_scheduler.state_dict(),
+                        },
+                        True, # is best
+                        out_dir=exp.ctx.model_dir,
+                        #filename=f"{str(args.lmbda).replace('0.','')}_checkpoint.pth.tar"
+                        filename=f"{exp.args.nameRun}_checkpoint.pth.tar"
+                    )
+
 
 
     if log_wandb:

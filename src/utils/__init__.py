@@ -10,7 +10,7 @@ from .dataset import TestKodakDataset
 from .functions import compute_metrics, compute_msssim, compute_psnr
 from .masks import delete_mask, save_mask, generate_mask_from_unstructured,\
     apply_saved_mask,generate_mask_from_structured,adjust_sampling_distribution,\
-    generate_mask_from_structured_fisher,lambda_percentage
+    generate_mask_from_structured_fisher,lambda_percentage,group_by_module
 
 #from .chengBA2_old import get_Cheng2020Attention_with_conv_switch, set_cheng2020Attention_index,frozen_cheng2020Attention
 from .chengBA2 import freeze_model_with_switch, inject_adapter,\

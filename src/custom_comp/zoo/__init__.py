@@ -25,7 +25,7 @@ from compressai.zoo import cheng2020_attn,mbt2018_mean
 from torch import load,zeros_like
 
 
-def symmetrical_transformer(state_dict_path):
+def STF_loading(state_dict_path):
     state_dict = load(state_dict_path)
     state_dict = load_state_dict(state_dict)
 
@@ -49,9 +49,32 @@ def symmetrical_transformer(state_dict_path):
     net.g_s = net.syn_layers
     return net
 
+def WACNN_loading(state_dict_path):
+
+    def clean_cnn_checkpoint(state_dict):
+        '''
+            All the key in the checkpoint have a prefix "module."
+            We need to remove it in order to match the keys of the model
+        '''
+        new_state_dict = {}
+        for k,v in state_dict.items():
+            new_key = k.replace("module.","")
+            new_state_dict[new_key] = v
+        return new_state_dict
+
+    state_dict = load(state_dict_path)
+    state_dict["state_dict"] = clean_cnn_checkpoint( state_dict["state_dict"])
+    state_dict = load_state_dict(state_dict)
+    state_dict = state_dict['state_dict']
+
+    net = WACNN()
+    net.load_state_dict(state_dict)
+    
+    return net
+
 models = {
-    'stf': lambda:symmetrical_transformer("/home/ids/flauron-23/MagV/pretrained_models/stf_0483.pth.tar"),
-    'cnn': WACNN,
+    'stf': lambda:STF_loading("/home/ids/flauron-23/MagV/pretrained_models/stf_0483.pth.tar"),
+    'cnn': lambda:WACNN_loading("/home/ids/flauron-23/MagV/pretrained_models/cnn_025_best.pth.tar"),
     'cheng': lambda:cheng2020_attn(quality=6,pretrained=True),
     'chengBA2': Cheng2020Attention_BA2,
     'msh': lambda:mbt2018_mean(quality=6,pretrained=True), # TODO same as cheng2020

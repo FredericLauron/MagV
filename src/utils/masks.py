@@ -117,7 +117,7 @@ def generate_mask_from_unstructured(model,amounts:list):
 
     for index in amounts:
 
-        if not np.isclose(index ,0.0):
+        if index > 0.0: #if not np.isclose(index ,0.0): 
             # generate the pruning masks
             prune.global_unstructured(parameters_to_prune, pruning_method=prune.L1Unstructured,amount=index)
             
@@ -413,13 +413,23 @@ def lambda_percentage(alpha,amount):
     Computes the percentage mapping based on the exponential mapping of lambda values.
     The number of points is determined by the length of the input alpha list.
     Arguments:
-        alpha: [list] The input alpha values.
-        amount: [float] The total amount for scaling. (ex: 0.6 for 60%)
+        alpha: [list] The input linearly evenly spaced alpha values.
+        amount: [float] The max amount for pruning. (ex: 0.6 for 60%)
     Returns:
         lambda_values: The computed lambda values.
         percentage: The computed percentage values."""
     lambda_max = 0.0483
     lambda_min = 0.0018
+    # If min pruning is not 0.0
+    if isinstance(alpha,float): #single float
+        if alpha>0.0:
+            lambda_max = np.exp(np.log(lambda_max) * (1 - alpha / amount) + np.log(lambda_min) * (alpha / amount))
+
+    else:
+        if alpha[-1]>0.0: # list of float
+            lambda_max = np.exp(np.log(lambda_max) * (1 - alpha[-1] / amount) + np.log(lambda_min) * (alpha[-1] / amount))
+
+    
     lambda_values = np.exp(np.log(lambda_max) * (1 - alpha / amount) + np.log(lambda_min) * (alpha / amount))
 
     return lambda_values,amount * (lambda_max - lambda_values) / (lambda_max - lambda_min)

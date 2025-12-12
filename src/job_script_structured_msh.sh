@@ -2,7 +2,8 @@
 #SBATCH --job-name=magv             # Name of your job
 #SBATCH --output=%x_%j.out            # Output file (%x for job name, %j for job ID)
 #SBATCH --error=%x_%j.err             # Error file
-#SBATCH --partition=L40S              # Partition to submit to (A100, V100, etc.)
+#SBATCH --partition=mm              # Partition to submit to (A100, V100, etc.)
+#SBATCH --nodelist=nodemm06
 
 
 #SBATCH --gres=gpu:1                  # Request 1 GPU

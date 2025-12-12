@@ -26,21 +26,21 @@ conda activate magv
 
 # Execute the Python script with specific arguments
 #srun python my_script.py --data $DATA_DIR --lr $LR --epochs $EPOCHS --batch-size $BATCH_SIZE
-srun python train_refactor.py   --batch-size=16 \
+srun python -m draft.test_VRMask2   --batch-size=16 \
                                     --cuda=1 \
                                     --dataset=/home/ids/flauron-23/fiftyone/open-images-v6 \
                                     --epochs=21 \
                                     --lambda=0.013 \
                                     --learning-rate=0.0001 \
-                                    --model=cheng \
+                                    --model=stf \
                                     --save=1 \
                                     --save-dir=../results/mask/adapt_0483 \
                                     --test-dir=/home/ids/flauron-23/kodak \
                                     --vanilla-adapt=1 \
                                     --num-workers=30 \
                                     --mask \
-                                    --maxPrunning=0.4 \
-                                    --nameRun=magv_04_cheng_unstructured \
+                                    --maxPrunning=0.6 \
+                                    --nameRun=test_VRMask_stf_06 \
                                     --maxPoint=6 \
                                     --pruningType=unstructured
                                     

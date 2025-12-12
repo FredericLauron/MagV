@@ -77,8 +77,11 @@ class Context:
             self._get_checkpoint(args)
 
         # Need to be set even for adapter to avoid errors
-        self.alpha = np.linspace(0.0, args.maxPrunning, args.maxPoint)[::-1]
+        self.alpha = np.linspace(args.minPruning, args.maxPrunning, args.maxPoint)[::-1]
         self.lambda_list , self.amounts = lambda_percentage(self.alpha, amount = args.maxPrunning)
+
+        if args.put_lambda_max:
+            self.lambda_list[-1] == 0.0483
         
         # Masks
         if args.mask:

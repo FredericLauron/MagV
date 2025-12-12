@@ -5,6 +5,7 @@
 #SBATCH --partition=mm              # Partition to submit to (A100, V100, etc.)
 #SBATCH --nodelist=nodemm06
 
+
 #SBATCH --gres=gpu:1                  # Request 1 GPU
 #SBATCH --cpus-per-task=30             # Request 8 CPU cores
 #SBATCH --mem=32G                     # Request 32 GB of memory
@@ -40,7 +41,8 @@ srun python train_refactor.py   --batch-size=16 \
                                     --num-workers=30 \
                                     --mask \
                                     --maxPrunning=0.4 \
-                                    --nameRun=magv_04_cheng_unstructured \
+                                    --minPruning=0.0 \
+                                    --nameRun=magv_0.1 \
                                     --maxPoint=6 \
                                     --pruningType=unstructured
                                     

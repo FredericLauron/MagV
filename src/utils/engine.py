@@ -67,8 +67,7 @@ def train_one_epoch(
             lambda_value = lambda_list[index]
             #print("index:", index, "lambda_value:", lambda_value)
 
-            if index != len(lambda_list)-1:
-
+            if lambda_list[index] < 0.0483: #if index != len(lambda_list)-1: # 
                 apply_saved_mask(model.g_a, all_mask["g_a"][index])
                 apply_saved_mask(model.g_s, all_mask["g_s"][index])
 

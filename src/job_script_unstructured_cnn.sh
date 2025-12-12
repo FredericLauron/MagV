@@ -2,8 +2,8 @@
 #SBATCH --job-name=magv             # Name of your job
 #SBATCH --output=%x_%j.out            # Output file (%x for job name, %j for job ID)
 #SBATCH --error=%x_%j.err             # Error file
-#SBATCH --partition=mm              # Partition to submit to (A100, V100, etc.)
-#SBATCH --nodelist=nodemm06
+#SBATCH --partition=L40S              # Partition to submit to (A100, V100, etc.)
+
 
 #SBATCH --gres=gpu:1                  # Request 1 GPU
 #SBATCH --cpus-per-task=30             # Request 8 CPU cores
@@ -32,7 +32,7 @@ srun python train_refactor.py   --batch-size=16 \
                                     --epochs=21 \
                                     --lambda=0.013 \
                                     --learning-rate=0.0001 \
-                                    --model=cheng \
+                                    --model=cnn \
                                     --save=1 \
                                     --save-dir=../results/mask/adapt_0483 \
                                     --test-dir=/home/ids/flauron-23/kodak \
@@ -40,7 +40,8 @@ srun python train_refactor.py   --batch-size=16 \
                                     --num-workers=30 \
                                     --mask \
                                     --maxPrunning=0.4 \
-                                    --nameRun=magv_04_cheng_unstructured \
+                                    --minPruning=0.0 \
+                                    --nameRun=magv_04_cnn_unstructured_40_epochs \
                                     --maxPoint=6 \
                                     --pruningType=unstructured
                                     

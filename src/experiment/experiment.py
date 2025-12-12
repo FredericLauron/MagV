@@ -112,9 +112,9 @@ class Experiment:
             self.ctx.net.update(force = True)
 
             if self.args.mask:
-                for index in range(len(self.ctx.lambda_list)):
+                for index in range(len(self.ctx.all_mask["g_a"])+1):# +1 to include no pruning case
 
-                    if index != len(self.ctx.lambda_list)-1:
+                    if index < len(self.ctx.all_mask["g_a"]):#if index != len(self.ctx.all_mask["g_a"]): # Last index is no pruning 
                         
                         apply_saved_mask(self.ctx.net.g_a, self.ctx.all_mask["g_a"][index])
                         apply_saved_mask(self.ctx.net.g_s, self.ctx.all_mask["g_s"][index])
@@ -179,13 +179,13 @@ class Experiment:
             with open("/home/ids/flauron-23/MagV/json/ref_results.json", "r") as f:
                 ref_results = json.load(f)
 
-            bpp_res["cheng"] = ref_results["bpp"]["cheng"]
-            psnr_res["cheng"] = ref_results["psnr"]["cheng"]
-            mssim_res["cheng"] = ref_results["mssim"]["cheng"]
+            # bpp_res["cheng"] = ref_results["bpp"]["cheng"]
+            # psnr_res["cheng"] = ref_results["psnr"]["cheng"]
+            # mssim_res["cheng"] = ref_results["mssim"]["cheng"]
 
-            bpp_res["stf"] = ref_results["bpp"]["stf"]
-            psnr_res["stf"] = ref_results["psnr"]["stf"]
-            mssim_res["stf"] = ref_results["mssim"]["stf"]
+            bpp_res[self.args.model] = ref_results["bpp"][self.args.model]
+            psnr_res[self.args.model] = ref_results["psnr"][self.args.model]
+            mssim_res[self.args.model] = ref_results["mssim"][self.args.model]
 
             plot_rate_distorsion(bpp_res, psnr_res, 
                                 epoch, eest="compression", 

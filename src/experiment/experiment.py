@@ -56,13 +56,13 @@ class Experiment:
                 psnr_list.append(psnr_ac)
                 mssim_list.append(mssim_ac)
 
-            for index in range(6):
-                refnet = cheng2020_attn(quality=index+1,pretrained=True).to(self.ctx.device)
-                ref_bpp_ac, ref_psnr_ac, ref_mssim_ac = compress_one_epoch(refnet, self.ctx.kodak_dataloader, self.ctx.device)
+            # for index in range(6):
+            #     refnet = cheng2020_attn(quality=index+1,pretrained=True).to(self.ctx.device) # TODO change that to model agnostic
+            #     ref_bpp_ac, ref_psnr_ac, ref_mssim_ac = compress_one_epoch(refnet, self.ctx.kodak_dataloader, self.ctx.device)
 
-                ref_bpp_list.append(ref_bpp_ac)
-                ref_psnr_list.append(ref_psnr_ac)
-                ref_mssim_list.append(ref_mssim_ac)
+            #     ref_bpp_list.append(ref_bpp_ac)
+            #     ref_psnr_list.append(ref_psnr_ac)
+            #     ref_mssim_list.append(ref_mssim_ac)
 
             psnr_res = {}
             mssim_res = {}
@@ -72,9 +72,12 @@ class Experiment:
             psnr_res["ours"] = psnr_list
             mssim_res["ours"] = mssim_list
             
-            bpp_res[self.args.model] = ref_bpp_list
-            psnr_res[self.args.model] = ref_psnr_list
-            mssim_res[self.args.model] = ref_mssim_list
+            with open("/home/ids/flauron-23/MagV/json/ref_results.json", "r") as f:
+                ref_results = json.load(f)
+                
+            bpp_res[self.args.model] = ref_results["bpp"][self.args.model]
+            psnr_res[self.args.model] = ref_results["psnr"][self.args.model]
+            mssim_res[self.args.model] = ref_results["mssim"][self.args.model]
 
             plot_rate_distorsion(bpp_res, psnr_res, 
                                 0, eest="compression_before_training", 
@@ -126,7 +129,8 @@ class Experiment:
 
                     # No mask for 0.483 lambda 0.0 amount pruning   
                     else:
-                        bpp_ac, psnr_ac, mssim_ac = compress_one_epoch(self.ctx.net, self.ctx.kodak_dataloader, self.ctx.device)
+                        if not self.args.put_lambda_max: 
+                            bpp_ac, psnr_ac, mssim_ac = compress_one_epoch(self.ctx.net, self.ctx.kodak_dataloader, self.ctx.device)
                     
                     bpp_list.append(bpp_ac)
                     psnr_list.append(psnr_ac)
@@ -227,6 +231,7 @@ class Experiment:
             self.ctx.aux_optimizer,
             epoch,
             self.args.clip_max_norm,
+            self.args.put_lambda_max,
             args_mask=self.args.mask,
             all_mask=self.ctx.all_mask if self.args.mask  else None,
             lambda_list=self.ctx.lambda_list if self.args.mask else None,

@@ -27,26 +27,15 @@ from torch import load,zeros_like
 
 def STF_loading(state_dict_path):
     state_dict = load(state_dict_path)
-    state_dict = load_state_dict(state_dict)
-
+    #state_dict = load_state_dict(state_dict)
     state_dict = state_dict['state_dict']
-    net = SymmetricalTransFormer()
-    
-    # if 'entropy_bottleneck._quantized_cdf' in state_dict:
-    #     state_dict['entropy_bottleneck._quantized_cdf'] = zeros_like(net.entropy_bottleneck._quantized_cdf)
-    # if 'entropy_bottleneck._cdf_length' in state_dict:
-    #     state_dict['entropy_bottleneck._cdf_length'] = zeros_like(net.entropy_bottleneck._cdf_length)
-    # if 'gaussian_conditional._quantized_cdf' in state_dict:
-    #     state_dict['gaussian_conditional._quantized_cdf'] = zeros_like(net.gaussian_conditional._quantized_cdf)
-    # if 'gaussian_conditional._cdf_length' in state_dict:
-    #     state_dict['gaussian_conditional._cdf_length'] = zeros_like(net.gaussian_conditional._cdf_length)
 
+    net = SymmetricalTransFormer()
     net.load_state_dict(state_dict)
-    # net.entropy_bottleneck.update(force=True)
-    #net.gaussian_conditional.update()
 
     net.g_a = net.layers
     net.g_s = net.syn_layers
+    
     return net
 
 def WACNN_loading(state_dict_path):
@@ -64,7 +53,7 @@ def WACNN_loading(state_dict_path):
 
     state_dict = load(state_dict_path)
     state_dict["state_dict"] = clean_cnn_checkpoint( state_dict["state_dict"])
-    state_dict = load_state_dict(state_dict)
+    state_dict = load_state_dict(state_dict["state_dict"])
     state_dict = state_dict['state_dict']
 
     net = WACNN()

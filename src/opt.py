@@ -122,6 +122,8 @@ def parse_args():
     parser.add_argument("--minPruning", type=float, default=0.0, help="Maximum pruning amount")
     parser.add_argument("--pruningType", type=str, default="unstructured", help="type of pruning [unstructured, structured, adapter]")
     parser.add_argument("--put_lambda_max", action="store_true", help="put last pruned mask to 0.0483")
+    parser.add_argument("--lambda_max", type=float, default=0.0483, help="Define Lagrangian max value")
+
 
 
 

@@ -37,6 +37,8 @@ def train_one_epoch(
         aux_optimizer, 
         epoch, 
         clip_max_norm,
+        put_lambda_max = False,
+        lambda_max = 0.0483,
         args_mask=None,
         all_mask=None,
         lambda_list=None,
@@ -62,14 +64,41 @@ def train_one_epoch(
         if args_mask is not None and lambda_list is not None:
             
             index = np.random.choice(np.arange(len(lambda_list)), p=probs)
-            #    index = torch.randint(0,6,(1,))
-
             lambda_value = lambda_list[index]
-            #print("index:", index, "lambda_value:", lambda_value)
 
-            if lambda_list[index] < 0.0483: #if index != len(lambda_list)-1: # 
+            lambda_anchor = lambda_max
+            
+            # With put_lambda_max==FALSE : 
+            # we are in the case where the last index of lambda_value is linked to 
+            # the anchor model for which there is NO mask
+            #   amount = [max,...,0.0], max in ]0,1]
+            #   lambda_value = [0.018,...,0.0483], 0.0483 is for the anchor model 
+            #   all_mask = [M1,...,Mn], n = len(lambda_list) -1. 
+            # Therefore, we apply a mask only when lambda_value < 0.0483
+
+            # With put_lambda_max==True  : we are in the case where the last index of lambda_value is 
+            # forced to 0.0483 and there is a mask we want to use
+            #   amount = [max,...,min], max in ]0,1] max > min  > 0.0
+            #   lambda_value = [0.018,...,some_value ], but is forced: some_value = 0.0483 
+            #   all_mask = [M1,...,Mn], n = len(lambda_list). There is a mask for min pruning level
+            apply_mask = (
+                (lambda_value < lambda_anchor) or
+                (put_lambda_max and abs(lambda_value - lambda_anchor) < 1e-6)
+            )
+
+            if apply_mask:
                 apply_saved_mask(model.g_a, all_mask["g_a"][index])
                 apply_saved_mask(model.g_s, all_mask["g_s"][index])
+
+            
+            # if lambda_list[index] < 0.0483 and not put_lambda_max : 
+            #     apply_saved_mask(model.g_a, all_mask["g_a"][index])
+            #     apply_saved_mask(model.g_s, all_mask["g_s"][index])
+            
+            # # With put_lambda_max we want to train a mask for RD level 0.0483
+            # elif abs(lambda_list[index] - 0.0483) <1e-6 and put_lambda_max:
+            #     apply_saved_mask(model.g_a, all_mask["g_a"][index])
+            #     apply_saved_mask(model.g_s, all_mask["g_s"][index])
 
             # else:
                 # No mask for 0.483 lambda 0.0 amount pruning   
@@ -79,9 +108,6 @@ def train_one_epoch(
 
         #Adapter
         elif  args_mask is None:
-            # Index selection. 
-            # An index is ramdomly selected (uniform distribution).
-            # The associated lambda is then selected from the lambda_list.     
                 
             # Selection of the index    
             index = np.random.choice(np.arange(6), p=probs)
@@ -90,14 +116,10 @@ def train_one_epoch(
             lambda_value = lambda_list[index]
 
             # Update the index in all the adapters
-            #model.set_index(index)
             set_index_switch(model,index)
 
             # Update the lambda in the optimizer
             criterion.lmbda = lambda_value
-
-            # print("Index has been set")
-            # print(f"Adapter - index: {index}, lambda: {lambda_value}")
 
         optimizer.zero_grad()
         if aux_optimizer is not None:
@@ -136,8 +158,7 @@ def train_one_epoch(
         mse_loss_metric.update(out_criterion["mse_loss"].clone().detach())
         aux_loss_metric.update(aux_loss.clone().detach())
 
-        if args_mask  and index != len(lambda_list)-1:
-            
+        if apply_mask: #if args_mask  and index != len(lambda_list)-1:
             delete_mask(model.g_a, parameters_to_prune["g_a"])
             delete_mask(model.g_s, parameters_to_prune["g_s"])
 

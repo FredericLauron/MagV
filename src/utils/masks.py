@@ -408,7 +408,7 @@ def generate_mask_from_structured_fisher(model,amounts:list,dataloader,criterion
 ############################################################END STRUCTURED PRUNING FISHER###################################################
 ############################################################################################################################################
 
-def lambda_percentage(alpha,amount):
+def lambda_percentage(alpha,amount,lambda_max=0.0483,lambda_min=0.0018):
     """
     Computes the percentage mapping based on the exponential mapping of lambda values.
     The number of points is determined by the length of the input alpha list.
@@ -418,8 +418,8 @@ def lambda_percentage(alpha,amount):
     Returns:
         lambda_values: The computed lambda values.
         percentage: The computed percentage values."""
-    lambda_max = 0.0483
-    lambda_min = 0.0018
+    lambda_max = lambda_max
+    lambda_min = lambda_min
     # If min pruning is not 0.0
     if isinstance(alpha,float): #single float
         if alpha>0.0:

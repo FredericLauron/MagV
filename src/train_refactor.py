@@ -12,6 +12,10 @@ def main():
     project_run_path=os.path.dirname(__file__)
 
     # security to not waste run
+    if args.put_lambda_max and args.minPruning ==0.0:
+        print("if put_lambda_max==TRUE, args.minPruning must be >0.0, because no mask are generated for 0.0percent of pruning")
+        return
+
     # if not args.mask and args.pruningType!="adapter":
     #     print("Mask is 0 or False, not adapter run — exiting program.")
     #     return

@@ -59,8 +59,6 @@ def load_model_from_checkpoint(checkpoint_path,factory_function,quality=6,pretra
 
 def load_mask(mask_path):
     mask = torch.load(mask_path, map_location='cpu')
-    # print(type(mask["g_a"][0])) 
-    # mask=mask.to("cuda")
     return mask
 
 def remove_pruning(model):

@@ -17,7 +17,11 @@ from typing import Dict
 from torch import Tensor
 
 def rename_key(key: str):
-    """Rename state_dict key."""
+    """Rename state_dict key
+    remove module prefix
+    remove key starting by h_s
+    Deal with entropy bottleneck
+    ."""
 
     # Deal with modules trained with DataParallel
     if key.startswith("module."):

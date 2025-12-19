@@ -232,6 +232,7 @@ class Experiment:
             epoch,
             self.args.clip_max_norm,
             self.args.put_lambda_max,
+            self.args.lambda_max,
             args_mask=self.args.mask,
             all_mask=self.ctx.all_mask if self.args.mask  else None,
             lambda_list=self.ctx.lambda_list if self.args.mask else None,

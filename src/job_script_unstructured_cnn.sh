@@ -2,7 +2,8 @@
 #SBATCH --job-name=magv             # Name of your job
 #SBATCH --output=%x_%j.out            # Output file (%x for job name, %j for job ID)
 #SBATCH --error=%x_%j.err             # Error file
-#SBATCH --partition=L40S              # Partition to submit to (A100, V100, etc.)
+#SBATCH --partition=mm              # Partition to submit to (A100, V100, etc.)
+#SBATCH --nodelist=nodemm06
 
 
 #SBATCH --gres=gpu:1                  # Request 1 GPU
@@ -29,7 +30,7 @@ conda activate magv
 srun python train_refactor.py   --batch-size=16 \
                                     --cuda=1 \
                                     --dataset=/home/ids/flauron-23/fiftyone/open-images-v6 \
-                                    --epochs=21 \
+                                    --epochs=41 \
                                     --lambda=0.013 \
                                     --learning-rate=0.0001 \
                                     --model=cnn \
@@ -41,9 +42,10 @@ srun python train_refactor.py   --batch-size=16 \
                                     --mask \
                                     --maxPrunning=0.4 \
                                     --minPruning=0.0 \
-                                    --nameRun=magv_04_cnn_unstructured_40_epochs \
-                                    --maxPoint=6 \
-                                    --pruningType=unstructured
-                                    
+                                    --nameRun=magv_04_cnn_unstruc_lambda_max_0.0250 \
+                                    --maxPoint=5 \
+                                    --pruningType=unstructured \
+                                    --lambda_max=0.0250
+
 # Print job completion time
 echo "Job finished at: $(date)"

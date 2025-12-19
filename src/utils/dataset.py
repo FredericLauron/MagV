@@ -33,3 +33,21 @@ class TestKodakDataset(Dataset):
 
     def __len__(self):
         return len(self.image_path)
+    
+class TestClicDataset(Dataset):
+    def __init__(self, data_dir):
+        self.data_dir = data_dir
+        if not os.path.exists(data_dir):
+            raise Exception(f"[!] {self.data_dir} not exitd")
+        self.image_path = sorted(glob(os.path.join(self.data_dir, "*.*")))
+
+        self.transform = transforms.Compose([transforms.ToTensor()])
+
+    def __getitem__(self, item):
+        image_ori = self.image_path[item]
+        image = Image.open(image_ori).convert('RGB')
+        
+        return self.transform(image)
+
+    def __len__(self):
+        return len(self.image_path)

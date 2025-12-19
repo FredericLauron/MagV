@@ -2,8 +2,7 @@
 #SBATCH --job-name=magv             # Name of your job
 #SBATCH --output=%x_%j.out            # Output file (%x for job name, %j for job ID)
 #SBATCH --error=%x_%j.err             # Error file
-#SBATCH --partition=mm              # Partition to submit to (A100, V100, etc.)
-#SBATCH --nodelist=nodemm06
+#SBATCH --partition=L40S              # Partition to submit to (A100, V100, etc.)
 
 
 #SBATCH --gres=gpu:1                  # Request 1 GPU
@@ -40,9 +39,9 @@ srun python train_refactor.py   --batch-size=16 \
                                     --vanilla-adapt=1 \
                                     --num-workers=30 \
                                     --mask \
-                                    --maxPrunning=0.4 \
+                                    --maxPrunning=0.5 \
                                     --minPruning=0.0 \
-                                    --nameRun=magv_0.1 \
+                                    --nameRun=magv_ablation_0.5 \
                                     --maxPoint=6 \
                                     --pruningType=unstructured
                                     

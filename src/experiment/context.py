@@ -78,11 +78,11 @@ class Context:
 
         # Need to be set even for adapter to avoid errors
         self.alpha = np.linspace(args.minPruning, args.maxPrunning, args.maxPoint)[::-1]
-        self.lambda_list , self.amounts = lambda_percentage(self.alpha, amount = args.maxPrunning)
+        self.lambda_list , self.amounts = lambda_percentage(self.alpha, amount = args.maxPrunning, lambda_max=args.lambda_max)
 
         if args.put_lambda_max:
-            self.lambda_list[-1] == 0.0483
-        
+            self.lambda_list[-1] == args.lambda_max
+
         # Masks
         if args.mask:
             self.all_mask, self.parameters_to_prune = self._get_mask(args)
@@ -140,6 +140,56 @@ class Context:
         
         return train_dataloader, val_dataloader, kodak_dataloader
     
+    @staticmethod
+    def get_kodak_dataloader(batch_size=1, num_workers=30, test_dir="/home/ids/flauron-23/kodak", device="cuda"):
+        kodak_dataset = TestKodakDataset(data_dir = test_dir) # Kodak test set
+
+        kodak_dataloader = DataLoader(
+            kodak_dataset, 
+            shuffle=False, 
+            batch_size=batch_size, 
+            pin_memory=(device=="cuda"), 
+            num_workers= num_workers 
+            )
+        
+        return kodak_dataloader
+
+    @staticmethod
+    def get_dataloaders(patch_size=(256,256),batch_size=16,test_batch_size=64,num_workers=30,dataset="/home/ids/flauron-23/fiftyone/open-images-v6",test_dir="/home/ids/flauron-23/kodak",device="cuda"):
+    
+        train_transforms = transforms.Compose([transforms.RandomCrop(patch_size), transforms.ToTensor()])
+        test_transforms = transforms.Compose([transforms.CenterCrop(patch_size), transforms.ToTensor()])
+
+        train_dataset = ImageFolder(dataset, split="train", transform=train_transforms)
+        test_dataset = ImageFolder(dataset, split="test", transform=test_transforms)
+        kodak_dataset = TestKodakDataset(data_dir = test_dir) # Kodak test set
+
+        train_dataloader = DataLoader(
+            train_dataset,
+            batch_size=batch_size,
+            num_workers=num_workers,
+            shuffle=True,
+            pin_memory=(device=="cuda"),
+            )
+
+        val_dataloader = DataLoader(
+            test_dataset,
+            batch_size=test_batch_size,
+            num_workers=num_workers,
+            shuffle=False,
+            pin_memory=(device=="cuda"),
+            )
+
+        kodak_dataloader = DataLoader(
+            kodak_dataset, 
+            shuffle=False, 
+            batch_size=1, 
+            pin_memory=(device=="cuda"), 
+            num_workers= num_workers 
+            )
+        
+        return train_dataloader, val_dataloader, kodak_dataloader
+
     def _get_model(self,args):
         net = models[args.model]()
         #net = net.to(self.device)

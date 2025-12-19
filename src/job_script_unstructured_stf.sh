@@ -30,7 +30,7 @@ conda activate magv
 srun python train_refactor.py   --batch-size=16 \
                                     --cuda=1 \
                                     --dataset=/home/ids/flauron-23/fiftyone/open-images-v6 \
-                                    --epochs=41 \
+                                    --epochs=21 \
                                     --lambda=0.013 \
                                     --learning-rate=0.0001 \
                                     --model=stf \
@@ -42,7 +42,7 @@ srun python train_refactor.py   --batch-size=16 \
                                     --mask \
                                     --maxPrunning=0.4 \
                                     --minPruning=0.05 \
-                                    --nameRun=magv_04_stf_unstructured_40_epochs \
+                                    --nameRun=magv_04_stf_unstruct_20_ep_put_lambda_max \
                                     --maxPoint=6 \
                                     --pruningType=unstructured\
                                     --put_lambda_max \

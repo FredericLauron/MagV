@@ -1,1 +1,1 @@
-from .eval import plot_rate_distorsion
+from .eval import plot_rate_distorsion,plot_rate_distorsion_psnr

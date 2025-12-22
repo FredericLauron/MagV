@@ -146,15 +146,14 @@ if __name__ == "__main__":
 
 
     # Load model and mask
-    # checkpoint_path = "/home/ids/flauron-23/MagV/data/magv_04_cheng_unstructured/models/magv_04_cheng_unstructured_checkpoint_best.pth.tar"
-    # mask_path="/home/ids/flauron-23/MagV/data/magv_04_cheng_unstructured/masks/mask_magv_04_cheng_unstructured.pth"
-    checkpoint_path = "/home/ids/flauron-23/MagV/data/magv_ablation_0.4/models/magv_ablation_0.4_checkpoint.pth.tar"
-    mask_path="/home/ids/flauron-23/MagV/data/magv_ablation_0.4/masks/mask_magv_ablation_0.4.pth"
+
+    # checkpoint_path = "/home/ids/flauron-23/MagV/data/magv_ablation_0.4/models/magv_ablation_0.4_checkpoint.pth.tar"
+    # mask_path="/home/ids/flauron-23/MagV/data/magv_ablation_0.4/masks/mask_magv_ablation_0.4.pth"
     #parameters_to_prune_path = "/home/ids/flauron-23/MagV/data/magv_04_cheng_unstructured/masks/parameters_to_prune_magv_04_cheng_unstructured.pth"
 
 
-    #checkpoint_path = "/home/ids/flauron-23/MagV/data/magv_06_stf_unstructured/models/magv_06_stf_unstructured_checkpoint.pth.tar"
-    #mask_path ="/home/ids/flauron-23/MagV/data/magv_06_stf_unstructured/masks/mask_magv_06_stf_unstructured.pth"
+    mask_path ="/home/ids/flauron-23/MagV/data/magv_06_stf_unstructured_40_epochs/masks/mask_magv_06_stf_unstructured_40_epochs.pth"
+    checkpoint_path = "MagV/data/magv_06_stf_unstructured_40_epochs/models/magv_06_stf_unstructured_40_epochs_checkpoint.pth.tar"
     net = load_model_from_checkpoint(checkpoint_path=checkpoint_path,factory_function=cheng2020_attn)
     mask = load_mask(mask_path=mask_path)
 
@@ -189,14 +188,15 @@ if __name__ == "__main__":
 
     # Define new pruning point
     #maxpruning = 0.6
-    newPoint = 0.03076923 #0.2 #Here define the new pruning point you want to test
+    # newPoint = 0.2 #Here define the new pruning point you want to test
+    newPoint = np.linspace(0, 0.4, 14)[::-1][1:-1]
     
     # Get the corresponding percentage for the new pruning point on the exponential curve 
     newPointPercentage =  lambda_percentage(newPoint, amount = args.maxPrunning)[1]
  
     # Generate new mask from unstructured pruning on reference model
-    newMask_g_a ,_ = generate_mask_from_unstructured(refnet.g_a,[newPointPercentage])
-    newMask_g_s ,_ = generate_mask_from_unstructured(refnet.g_s,[newPointPercentage])
+    newMask_g_a ,_ = generate_mask_from_unstructured(refnet.g_a,newPointPercentage)
+    newMask_g_s ,_ = generate_mask_from_unstructured(refnet.g_s,newPointPercentage)
 
 
     print(type(newMask_g_a[0]))
@@ -207,15 +207,17 @@ if __name__ == "__main__":
     for k, v in newMask_g_s[0].items():
          newMask_g_s[0][k] = v.to("cuda")
     
-    # Get the index of the new pruning 
-    linAmount = np.linspace(0.0, args.maxPrunning, args.maxPoint)[::-1]
-    idx = bisect.bisect_left([-x for x in linAmount], -newPoint)
+    # Get the index of the new pruning
+    linAmount = (np.linspace(0.0, args.maxPrunning, args.maxPoint)[::-1]).tolist()
+    for i, point in enumerate(newPoint):
+        idx = bisect.bisect_left([-x for x in linAmount], -point)
+        linAmount.insert(idx, point)
 
-    print(f"Applying new mask at index {idx} corresponding to pruning point {newPoint} with percentage {newPointPercentage}")
+        print(f"Applying new mask at index {idx} corresponding to pruning point {point} with percentage {newPointPercentage[i]}")
 
-    # Apply the new mask to both g_a and g_s
-    mask["g_a"].insert(idx,newMask_g_a[0])
-    mask["g_s"].insert(idx,newMask_g_s[0])
+        # Apply the new mask to both g_a and g_s
+        mask["g_a"].insert(idx,newMask_g_a[i])
+        mask["g_s"].insert(idx,newMask_g_s[i])
 
     exp.ctx.net = net
     exp.ctx.all_mask = mask

@@ -78,7 +78,7 @@ class Context:
 
         # Need to be set even for adapter to avoid errors
         self.alpha = np.linspace(args.minPruning, args.maxPrunning, args.maxPoint)[::-1]
-        self.lambda_list , self.amounts = lambda_percentage(self.alpha, amount = args.maxPrunning, lambda_max=args.lambda_max)
+        self.lambda_list , self.amounts = lambda_percentage(self.alpha, amount = args.maxPrunning, lambda_max=args.lambda_max,lambda_min=args.lambda_min)
 
         if args.put_lambda_max:
             self.lambda_list[-1] == args.lambda_max

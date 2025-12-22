@@ -2,7 +2,8 @@
 #SBATCH --job-name=magv             # Name of your job
 #SBATCH --output=%x_%j.out            # Output file (%x for job name, %j for job ID)
 #SBATCH --error=%x_%j.err             # Error file
-#SBATCH --partition=L40S              # Partition to submit to (A100, V100, etc.)
+#SBATCH --partition=mm              # Partition to submit to (A100, V100, etc.)
+
 
 #SBATCH --gres=gpu:1                  # Request 1 GPU
 #SBATCH --cpus-per-task=30             # Request 8 CPU cores
@@ -41,7 +42,7 @@ srun python train_refactor.py   --batch-size=16 \
                                     --maxPrunning=0.9 \
                                     --nameRun=magv_90_perc_cheng_unstructured \
                                     --maxPoint=6 \
-                                    --pruningType=unstructured
+                                    --pruningType=unstructuredMagV/src/job_script_ablation_unstructured_cheng.sh
                                     
 # Print job completion time
 echo "Job finished at: $(date)"

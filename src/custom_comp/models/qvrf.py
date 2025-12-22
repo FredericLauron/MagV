@@ -480,7 +480,8 @@ class QVRFCheng(Cheng2020Anchor): #replace with cheng
                 rv = decoder.decode_stream(
                     indexes.squeeze().tolist(), cdf, cdf_lengths, offsets
                 )
-                rv = torch.Tensor(rv).reshape(1, -1, 1, 1)
+                rv = torch.Tensor(rv).reshape(1, -1, 1, 1).to("cuda")
+                
                 rv = self.gaussian_conditional.dequantize(rv)*rescale + means_hat
 
                 hp = h + padding

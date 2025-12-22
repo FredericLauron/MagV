@@ -33,18 +33,20 @@ srun python train_refactor.py   --batch-size=16 \
                                     --epochs=41 \
                                     --lambda=0.013 \
                                     --learning-rate=0.0001 \
-                                    --model=stf \
+                                    --model=tcm \
                                     --save=1 \
                                     --save-dir=../results/mask/adapt_0483 \
                                     --test-dir=/home/ids/flauron-23/kodak \
                                     --vanilla-adapt=1 \
                                     --num-workers=30 \
                                     --mask \
-                                    --maxPrunning=0.55 \
+                                    --maxPrunning=0.40 \
                                     --minPruning=0.0 \
-                                    --nameRun=magv_55_stf_unstruct_41_epochs \
+                                    --nameRun=magv_40_tcm \
                                     --maxPoint=6 \
-                                    --pruningType=unstructured
+                                    --lambda_max=0.05 \
+                                    --lambda_min=0.0025 \
+                                    --pruningType=unstructured\
                                     
 # Print job completion time
 echo "Job finished at: $(date)"

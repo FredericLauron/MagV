@@ -14,7 +14,7 @@
 
 
 # from custom_compress .models import SymmetricalTransFormer, WACNN
-from custom_comp.models import SymmetricalTransFormer, WACNN, Cheng2020Attention_BA2,QVRFCheng,stfQVRF,GainedMSHyperprior
+from custom_comp.models import SymmetricalTransFormer, WACNN, Cheng2020Attention_BA2,QVRFCheng,stfQVRF,GainedMSHyperprior,TCM
 
 from .pretrained import load_pretrained as load_state_dict
 from compressai.models.waseda import Cheng2020Attention
@@ -128,5 +128,6 @@ models = {
     'cheng': lambda:cheng2020_attn(quality=6,pretrained=True),
     'msh': lambda:mbt2018_mean(quality=6,pretrained=True),
     'gained': lambda:model_loading(GainedMSHyperprior,"/home/ids/flauron-23/MagV/pretrained_models/checkpoint_gainmshp_epoch90.pth")[1],
-    'ours': lambda:model_loading(Cheng2020Attention,"/home/ids/flauron-23/MagV/data/magv_04_cheng_unstructured/models/magv_04_cheng_unstructured_checkpoint_best.pth.tar")[1]
+    'ours': lambda:model_loading(Cheng2020Attention,"/home/ids/flauron-23/MagV/data/magv_ablation_0.4/models/magv_ablation_0.4_checkpoint.pth.tar")[1],
+    'tcm': lambda:model_loading(TCM,"/home/ids/flauron-23/MagV/pretrained_models/tcm_0.05.pth.tar")[1]
 }

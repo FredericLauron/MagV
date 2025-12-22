@@ -5,3 +5,4 @@ from .chengBA2_old import Cheng2020Attention_BA2
 from .qvrf import QVRFCheng
 from .stf_qvrf import stfQVRF
 from .gainedMSH import GainedMSHyperprior
+from .tcm import TCM

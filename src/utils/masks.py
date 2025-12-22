@@ -112,7 +112,7 @@ def generate_mask_from_unstructured(model,amounts:list):
 
     #register all the parameters for the model that are available for pruning
     parameters_to_prune = [(module, "weight") for module in filter(lambda m: type(m) in [torch.nn.Conv2d, torch.nn.Linear,torch.nn.ConvTranspose2d], model.modules())]
-
+    #parameters_to_prune = [(module, "weight") for name, module in model.named_modules()  if isinstance(module, (torch.nn.Linear, torch.nn.Conv2d, torch.nn.ConvTranspose2d)) and not name.endswith("attn.qkv")]
     out_all_mask = []
 
     for index in amounts:
@@ -421,13 +421,13 @@ def lambda_percentage(alpha,amount,lambda_max=0.0483,lambda_min=0.0018):
     lambda_max = lambda_max
     lambda_min = lambda_min
     # If min pruning is not 0.0
-    if isinstance(alpha,float): #single float
-        if alpha>0.0:
-            lambda_max = np.exp(np.log(lambda_max) * (1 - alpha / amount) + np.log(lambda_min) * (alpha / amount))
+    # if isinstance(alpha,float): #single float
+    #     if alpha>0.0:
+    #         lambda_max = np.exp(np.log(lambda_max) * (1 - alpha / amount) + np.log(lambda_min) * (alpha / amount))
 
-    else:
-        if alpha[-1]>0.0: # list of float
-            lambda_max = np.exp(np.log(lambda_max) * (1 - alpha[-1] / amount) + np.log(lambda_min) * (alpha[-1] / amount))
+    # else:
+    #     if alpha[-1]>0.0: # list of float
+    #         lambda_max = np.exp(np.log(lambda_max) * (1 - alpha[-1] / amount) + np.log(lambda_min) * (alpha[-1] / amount))
 
     
     lambda_values = np.exp(np.log(lambda_max) * (1 - alpha / amount) + np.log(lambda_min) * (alpha / amount))

@@ -42,8 +42,8 @@ srun python train_refactor.py   --batch-size=16 \
                                     --mask \
                                     --maxPrunning=0.4 \
                                     --minPruning=0.0 \
-                                    --nameRun=magv_04_cnn_unstruc_lambda_max_0.0250 \
-                                    --maxPoint=5 \
+                                    --nameRun=magv_04_cnn_unstruc_lambda_max_0.0250_4_pts \
+                                    --maxPoint=4 \
                                     --pruningType=unstructured \
                                     --lambda_max=0.0250
 
